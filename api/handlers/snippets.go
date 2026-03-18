@@ -1,0 +1,37 @@
+package handlers
+
+import (
+	"net/http"
+
+	"hongik-backend/model"
+
+	"github.com/gin-gonic/gin"
+)
+
+func (h *Handler) ListSnippets(c *gin.Context) {
+	snippets := h.store.ListSnippets()
+	c.JSON(http.StatusOK, gin.H{"snippets": snippets})
+}
+
+func (h *Handler) GetSnippet(c *gin.Context) {
+	id := c.Param("id")
+
+	snippet, ok := h.store.GetSnippet(id)
+	if !ok {
+		c.JSON(http.StatusNotFound, model.ErrorResponse{Error: "스니펫을 찾을 수 없습니다"})
+		return
+	}
+
+	c.JSON(http.StatusOK, snippet)
+}
+
+func (h *Handler) CreateSnippet(c *gin.Context) {
+	var req model.CreateSnippetRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, model.ErrorResponse{Error: "제목과 코드를 입력해주세요"})
+		return
+	}
+
+	snippet := h.store.CreateSnippet(req)
+	c.JSON(http.StatusCreated, snippet)
+}
