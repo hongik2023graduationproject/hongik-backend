@@ -3,6 +3,8 @@ package service
 import (
 	"errors"
 	"log"
+	"sort"
+	"strings"
 	"sync"
 	"time"
 
@@ -96,15 +98,78 @@ func (s *Store) cleanupExpiredShares() {
 
 // Snippet operations
 
-func (s *Store) ListSnippets() []model.Snippet {
+func (s *Store) ListSnippets(page, limit int) ([]model.Snippet, int) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
-	result := make([]model.Snippet, 0, len(s.snippets))
+	all := make([]model.Snippet, 0, len(s.snippets))
 	for _, sn := range s.snippets {
-		result = append(result, sn)
+		all = append(all, sn)
 	}
-	return result
+	sort.Slice(all, func(i, j int) bool {
+		return all[i].CreatedAt.After(all[j].CreatedAt)
+	})
+
+	total := len(all)
+	start := (page - 1) * limit
+	if start >= total {
+		return []model.Snippet{}, total
+	}
+	end := start + limit
+	if end > total {
+		end = total
+	}
+	return all[start:end], total
+}
+
+func (s *Store) SearchSnippets(query string, page, limit int) ([]model.Snippet, int) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	q := strings.ToLower(query)
+	var matched []model.Snippet
+	for _, sn := range s.snippets {
+		if strings.Contains(strings.ToLower(sn.Title), q) || strings.Contains(strings.ToLower(sn.Description), q) {
+			matched = append(matched, sn)
+		}
+	}
+	sort.Slice(matched, func(i, j int) bool {
+		return matched[i].CreatedAt.After(matched[j].CreatedAt)
+	})
+
+	total := len(matched)
+	start := (page - 1) * limit
+	if start >= total {
+		return []model.Snippet{}, total
+	}
+	end := start + limit
+	if end > total {
+		end = total
+	}
+	return matched[start:end], total
+}
+
+func (s *Store) ForkSnippet(id string, userID string) (model.Snippet, bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	original, ok := s.snippets[id]
+	if !ok {
+		return model.Snippet{}, false
+	}
+
+	now := time.Now()
+	forked := model.Snippet{
+		ID:          uuid.New().String(),
+		Title:       original.Title + " (복사본)",
+		Code:        original.Code,
+		Description: original.Description,
+		UserID:      userID,
+		CreatedAt:   now,
+		UpdatedAt:   now,
+	}
+	s.snippets[forked.ID] = forked
+	return forked, true
 }
 
 func (s *Store) GetSnippet(id string) (model.Snippet, bool) {

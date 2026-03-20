@@ -30,10 +30,12 @@ func RegisterRoutes(router *gin.Engine, store *service.Store, interpreter *servi
 
 		// Snippet endpoints - GET is public, mutations require auth
 		api.GET("/snippets", h.ListSnippets)
+		api.GET("/snippets/search", h.SearchSnippets)
 		api.GET("/snippets/:id", h.GetSnippet)
 		api.POST("/snippets", authRequired, h.CreateSnippet)
 		api.PUT("/snippets/:id", authRequired, h.UpdateSnippet)
 		api.DELETE("/snippets/:id", authRequired, h.DeleteSnippet)
+		api.POST("/snippets/:id/fork", authRequired, h.ForkSnippet)
 
 		api.POST("/share", h.CreateShare)
 		api.GET("/share/:token", h.GetShare)

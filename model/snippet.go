@@ -23,3 +23,10 @@ type UpdateSnippetRequest struct {
 	Code        string `json:"code" binding:"required"`
 	Description string `json:"description"`
 }
+
+type SnippetListResponse struct {
+	Snippets []Snippet `json:"snippets"`
+	Total    int       `json:"total"`
+	Page     int       `json:"page"`
+	Limit    int       `json:"limit"`
+}

@@ -56,6 +56,10 @@ func (s *InterpreterService) Execute(req model.ExecuteRequest) model.ExecuteResp
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
 
+	if req.Input != "" {
+		cmd.Stdin = bytes.NewReader([]byte(req.Input))
+	}
+
 	err = cmd.Run()
 	elapsed := time.Since(start).Milliseconds()
 

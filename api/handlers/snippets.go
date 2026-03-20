@@ -2,15 +2,68 @@ package handlers
 
 import (
 	"net/http"
+	"strconv"
 
 	"hongik-backend/model"
 
 	"github.com/gin-gonic/gin"
 )
 
+func parsePagination(c *gin.Context) (int, int) {
+	page := 1
+	limit := 20
+	if p, err := strconv.Atoi(c.Query("page")); err == nil && p > 0 {
+		page = p
+	}
+	if l, err := strconv.Atoi(c.Query("limit")); err == nil && l > 0 {
+		limit = l
+	}
+	if limit > 100 {
+		limit = 100
+	}
+	return page, limit
+}
+
 func (h *Handler) ListSnippets(c *gin.Context) {
-	snippets := h.store.ListSnippets()
-	c.JSON(http.StatusOK, gin.H{"snippets": snippets})
+	page, limit := parsePagination(c)
+	snippets, total := h.store.ListSnippets(page, limit)
+	c.JSON(http.StatusOK, model.SnippetListResponse{
+		Snippets: snippets,
+		Total:    total,
+		Page:     page,
+		Limit:    limit,
+	})
+}
+
+func (h *Handler) SearchSnippets(c *gin.Context) {
+	query := c.Query("q")
+	if query == "" {
+		c.JSON(http.StatusBadRequest, model.ErrorResponse{Error: "검색어를 입력해주세요"})
+		return
+	}
+	page, limit := parsePagination(c)
+	snippets, total := h.store.SearchSnippets(query, page, limit)
+	c.JSON(http.StatusOK, model.SnippetListResponse{
+		Snippets: snippets,
+		Total:    total,
+		Page:     page,
+		Limit:    limit,
+	})
+}
+
+func (h *Handler) ForkSnippet(c *gin.Context) {
+	id := c.Param("id")
+
+	userID, _ := c.Get("userID")
+	userIDStr, _ := userID.(string)
+
+	forked, ok := h.store.ForkSnippet(id, userIDStr)
+	if !ok {
+		c.JSON(http.StatusNotFound, model.ErrorResponse{Error: "스니펫을 찾을 수 없습니다"})
+		return
+	}
+
+	c.JSON(http.StatusCreated, forked)
 }
 
 func (h *Handler) GetSnippet(c *gin.Context) {

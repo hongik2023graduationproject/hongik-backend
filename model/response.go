@@ -2,6 +2,7 @@ package model
 
 type ExecuteRequest struct {
 	Code    string `json:"code" binding:"required"`
+	Input   string `json:"input"`
 	Timeout int    `json:"timeout"` // seconds, 0 = use default (5s)
 }
 

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"hongik-backend/config"
@@ -39,10 +40,12 @@ func setupRouter() *gin.Engine {
 	router := gin.New()
 	router.GET("/health", h.HealthCheck)
 	router.GET("/api/snippets", h.ListSnippets)
+	router.GET("/api/snippets/search", h.SearchSnippets)
 	router.GET("/api/snippets/:id", h.GetSnippet)
 	router.POST("/api/snippets", authRequired, h.CreateSnippet)
 	router.PUT("/api/snippets/:id", authRequired, h.UpdateSnippet)
 	router.DELETE("/api/snippets/:id", authRequired, h.DeleteSnippet)
+	router.POST("/api/snippets/:id/fork", authRequired, h.ForkSnippet)
 	router.POST("/api/share", h.CreateShare)
 	router.GET("/api/share/:token", h.GetShare)
 	router.GET("/api/language/builtins", h.GetBuiltins)
@@ -103,10 +106,19 @@ func TestListSnippets(t *testing.T) {
 		t.Errorf("expected 200, got %d", w.Code)
 	}
 
-	var resp map[string][]map[string]interface{}
+	var resp model.SnippetListResponse
 	json.Unmarshal(w.Body.Bytes(), &resp)
-	if len(resp["snippets"]) != 5 {
-		t.Errorf("expected 5 seed snippets, got %d", len(resp["snippets"]))
+	if len(resp.Snippets) != 5 {
+		t.Errorf("expected 5 seed snippets, got %d", len(resp.Snippets))
+	}
+	if resp.Total != 5 {
+		t.Errorf("expected total 5, got %d", resp.Total)
+	}
+	if resp.Page != 1 {
+		t.Errorf("expected page 1, got %d", resp.Page)
+	}
+	if resp.Limit != 20 {
+		t.Errorf("expected default limit 20, got %d", resp.Limit)
 	}
 }
 
@@ -779,5 +791,264 @@ func TestDeleteSnippetForbidden(t *testing.T) {
 
 	if w2.Code != http.StatusForbidden {
 		t.Errorf("expected 403, got %d", w2.Code)
+	}
+}
+
+// Pagination tests
+
+func TestListSnippetsPagination(t *testing.T) {
+	router := setupRouter()
+
+	// Request page 1 with limit 2
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest("GET", "/api/snippets?page=1&limit=2", nil)
+	router.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", w.Code)
+	}
+
+	var resp model.SnippetListResponse
+	json.Unmarshal(w.Body.Bytes(), &resp)
+	if len(resp.Snippets) != 2 {
+		t.Errorf("expected 2 snippets, got %d", len(resp.Snippets))
+	}
+	if resp.Total != 5 {
+		t.Errorf("expected total 5, got %d", resp.Total)
+	}
+	if resp.Page != 1 {
+		t.Errorf("expected page 1, got %d", resp.Page)
+	}
+	if resp.Limit != 2 {
+		t.Errorf("expected limit 2, got %d", resp.Limit)
+	}
+
+	// Request page 3 with limit 2 (should get 1 item)
+	w2 := httptest.NewRecorder()
+	req2 := httptest.NewRequest("GET", "/api/snippets?page=3&limit=2", nil)
+	router.ServeHTTP(w2, req2)
+
+	var resp2 model.SnippetListResponse
+	json.Unmarshal(w2.Body.Bytes(), &resp2)
+	if len(resp2.Snippets) != 1 {
+		t.Errorf("expected 1 snippet on page 3, got %d", len(resp2.Snippets))
+	}
+}
+
+func TestListSnippetsLimitCap(t *testing.T) {
+	router := setupRouter()
+
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest("GET", "/api/snippets?limit=200", nil)
+	router.ServeHTTP(w, req)
+
+	var resp model.SnippetListResponse
+	json.Unmarshal(w.Body.Bytes(), &resp)
+	if resp.Limit != 100 {
+		t.Errorf("expected limit capped to 100, got %d", resp.Limit)
+	}
+}
+
+func TestListSnippetsPageBeyondRange(t *testing.T) {
+	router := setupRouter()
+
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest("GET", "/api/snippets?page=999", nil)
+	router.ServeHTTP(w, req)
+
+	var resp model.SnippetListResponse
+	json.Unmarshal(w.Body.Bytes(), &resp)
+	if len(resp.Snippets) != 0 {
+		t.Errorf("expected 0 snippets for out-of-range page, got %d", len(resp.Snippets))
+	}
+	if resp.Total != 5 {
+		t.Errorf("expected total 5, got %d", resp.Total)
+	}
+}
+
+// Search tests
+
+func TestSearchSnippets(t *testing.T) {
+	router := setupRouter()
+
+	// Search for "배열" which matches a seed snippet
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest("GET", "/api/snippets/search?q=배열", nil)
+	router.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", w.Code)
+	}
+
+	var resp model.SnippetListResponse
+	json.Unmarshal(w.Body.Bytes(), &resp)
+	if resp.Total == 0 {
+		t.Error("expected at least one result for '배열'")
+	}
+	for _, sn := range resp.Snippets {
+		if !containsIgnoreCase(sn.Title, "배열") && !containsIgnoreCase(sn.Description, "배열") {
+			t.Errorf("snippet %q does not match search query", sn.Title)
+		}
+	}
+}
+
+func containsIgnoreCase(s, substr string) bool {
+	return len(s) >= len(substr) && (s == substr || len(substr) == 0 ||
+		func() bool {
+			for i := 0; i <= len(s)-len(substr); i++ {
+				if strings.EqualFold(s[i:i+len(substr)], substr) {
+					return true
+				}
+			}
+			return false
+		}())
+}
+
+func TestSearchSnippetsNoQuery(t *testing.T) {
+	router := setupRouter()
+
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest("GET", "/api/snippets/search", nil)
+	router.ServeHTTP(w, req)
+
+	if w.Code != http.StatusBadRequest {
+		t.Errorf("expected 400, got %d", w.Code)
+	}
+}
+
+func TestSearchSnippetsNoResults(t *testing.T) {
+	router := setupRouter()
+
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest("GET", "/api/snippets/search?q=존재하지않는검색어", nil)
+	router.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", w.Code)
+	}
+
+	var resp model.SnippetListResponse
+	json.Unmarshal(w.Body.Bytes(), &resp)
+	if resp.Total != 0 {
+		t.Errorf("expected 0 results, got %d", resp.Total)
+	}
+	if len(resp.Snippets) != 0 {
+		t.Errorf("expected empty snippets, got %d", len(resp.Snippets))
+	}
+}
+
+func TestSearchSnippetsPagination(t *testing.T) {
+	router := setupRouter()
+
+	// Search for "예제" which should match multiple seed snippets
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest("GET", "/api/snippets/search?q=예제&limit=2&page=1", nil)
+	router.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", w.Code)
+	}
+
+	var resp model.SnippetListResponse
+	json.Unmarshal(w.Body.Bytes(), &resp)
+	if len(resp.Snippets) > 2 {
+		t.Errorf("expected at most 2 snippets, got %d", len(resp.Snippets))
+	}
+	if resp.Limit != 2 {
+		t.Errorf("expected limit 2, got %d", resp.Limit)
+	}
+}
+
+// Fork tests
+
+func TestForkSnippet(t *testing.T) {
+	router := setupRouter()
+	token := registerAndGetToken(t, router, "forkuser", "testpass")
+
+	// Create a snippet
+	createBody, _ := json.Marshal(map[string]string{
+		"title":       "원본 코드",
+		"code":        "출력(1)",
+		"description": "원본 설명",
+	})
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest("POST", "/api/snippets", bytes.NewReader(createBody))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+token)
+	router.ServeHTTP(w, req)
+
+	var created map[string]interface{}
+	json.Unmarshal(w.Body.Bytes(), &created)
+	originalID := created["id"].(string)
+
+	// Fork it with a different user
+	token2 := registerAndGetToken(t, router, "forkuser2", "testpass")
+	w2 := httptest.NewRecorder()
+	req2 := httptest.NewRequest("POST", "/api/snippets/"+originalID+"/fork", nil)
+	req2.Header.Set("Authorization", "Bearer "+token2)
+	router.ServeHTTP(w2, req2)
+
+	if w2.Code != http.StatusCreated {
+		t.Fatalf("fork: expected 201, got %d: %s", w2.Code, w2.Body.String())
+	}
+
+	var forked map[string]interface{}
+	json.Unmarshal(w2.Body.Bytes(), &forked)
+
+	if forked["title"] != "원본 코드 (복사본)" {
+		t.Errorf("expected title '원본 코드 (복사본)', got %v", forked["title"])
+	}
+	if forked["code"] != "출력(1)" {
+		t.Errorf("expected same code, got %v", forked["code"])
+	}
+	if forked["id"] == originalID {
+		t.Error("forked snippet should have a different ID")
+	}
+}
+
+func TestForkSnippetNotFound(t *testing.T) {
+	router := setupRouter()
+	token := registerAndGetToken(t, router, "forkuser3", "testpass")
+
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest("POST", "/api/snippets/nonexistent/fork", nil)
+	req.Header.Set("Authorization", "Bearer "+token)
+	router.ServeHTTP(w, req)
+
+	if w.Code != http.StatusNotFound {
+		t.Errorf("expected 404, got %d", w.Code)
+	}
+}
+
+func TestForkSnippetRequiresAuth(t *testing.T) {
+	router := setupRouter()
+
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest("POST", "/api/snippets/someid/fork", nil)
+	router.ServeHTTP(w, req)
+
+	if w.Code != http.StatusUnauthorized {
+		t.Errorf("expected 401, got %d", w.Code)
+	}
+}
+
+// Execute with input test
+
+func TestExecuteWithInput(t *testing.T) {
+	router := setupRouter()
+
+	body, _ := json.Marshal(map[string]interface{}{
+		"code":  "출력(입력())",
+		"input": "안녕하세요",
+	})
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest("POST", "/api/execute", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	router.ServeHTTP(w, req)
+
+	// We can't test actual execution (no interpreter binary in test),
+	// but we verify the request is accepted (not 400)
+	if w.Code == http.StatusBadRequest {
+		t.Errorf("expected request with input to be accepted, got 400")
 	}
 }
