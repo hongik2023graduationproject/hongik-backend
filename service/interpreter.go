@@ -49,6 +49,14 @@ func (s *InterpreterService) Execute(req model.ExecuteRequest) model.ExecuteResp
 		}
 	}
 
+	output := stdout.String()
+
+	// Truncate output if it exceeds the max output size
+	maxBytes := s.cfg.MaxOutputBytes
+	if maxBytes > 0 && len(output) > maxBytes {
+		output = output[:maxBytes] + fmt.Sprintf("\n\n... 출력이 %d바이트 제한을 초과하여 잘렸습니다", maxBytes)
+	}
+
 	if err != nil {
 		errMsg := stderr.String()
 		if errMsg == "" {
@@ -56,7 +64,7 @@ func (s *InterpreterService) Execute(req model.ExecuteRequest) model.ExecuteResp
 		}
 		return model.ExecuteResponse{
 			Status:          "error",
-			Output:          stdout.String(),
+			Output:          output,
 			Error:           errMsg,
 			ExecutionTimeMs: elapsed,
 		}
@@ -64,7 +72,7 @@ func (s *InterpreterService) Execute(req model.ExecuteRequest) model.ExecuteResp
 
 	return model.ExecuteResponse{
 		Status:          "success",
-		Output:          stdout.String(),
+		Output:          output,
 		ExecutionTimeMs: elapsed,
 	}
 }

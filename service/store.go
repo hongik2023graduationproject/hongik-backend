@@ -1,6 +1,7 @@
 package service
 
 import (
+	"errors"
 	"log"
 	"sync"
 	"time"
@@ -8,6 +9,7 @@ import (
 	"hongik-backend/model"
 
 	"github.com/google/uuid"
+	"golang.org/x/crypto/bcrypt"
 )
 
 const shareTTL = 24 * time.Hour
@@ -16,12 +18,16 @@ type Store struct {
 	mu       sync.RWMutex
 	snippets map[string]model.Snippet
 	shares   map[string]model.SharedCode
+	users    map[string]model.User // keyed by user ID
+	userByName map[string]string   // username -> user ID
 }
 
 func NewStore() *Store {
 	s := &Store{
-		snippets: make(map[string]model.Snippet),
-		shares:   make(map[string]model.SharedCode),
+		snippets:   make(map[string]model.Snippet),
+		shares:     make(map[string]model.SharedCode),
+		users:      make(map[string]model.User),
+		userByName: make(map[string]string),
 	}
 	s.seedExamples()
 	go s.cleanupExpiredShares()
@@ -109,7 +115,7 @@ func (s *Store) GetSnippet(id string) (model.Snippet, bool) {
 	return sn, ok
 }
 
-func (s *Store) CreateSnippet(req model.CreateSnippetRequest) model.Snippet {
+func (s *Store) CreateSnippet(req model.CreateSnippetRequest, userID string) model.Snippet {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -119,11 +125,52 @@ func (s *Store) CreateSnippet(req model.CreateSnippetRequest) model.Snippet {
 		Title:       req.Title,
 		Code:        req.Code,
 		Description: req.Description,
+		UserID:      userID,
 		CreatedAt:   now,
 		UpdatedAt:   now,
 	}
 	s.snippets[sn.ID] = sn
 	return sn
+}
+
+func (s *Store) UpdateSnippet(id string, req model.UpdateSnippetRequest, userID string) (model.Snippet, bool, bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	sn, ok := s.snippets[id]
+	if !ok {
+		return model.Snippet{}, false, false
+	}
+
+	// Check ownership: if snippet has a userID, only that user can update
+	if sn.UserID != "" && sn.UserID != userID {
+		return model.Snippet{}, true, false // exists but not owned
+	}
+
+	sn.Title = req.Title
+	sn.Code = req.Code
+	sn.Description = req.Description
+	sn.UpdatedAt = time.Now()
+	s.snippets[id] = sn
+	return sn, true, true
+}
+
+func (s *Store) DeleteSnippet(id string, userID string) (bool, bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	sn, ok := s.snippets[id]
+	if !ok {
+		return false, false
+	}
+
+	// Check ownership: if snippet has a userID, only that user can delete
+	if sn.UserID != "" && sn.UserID != userID {
+		return true, false // exists but not owned
+	}
+
+	delete(s.snippets, id)
+	return true, true
 }
 
 // Share operations
@@ -156,4 +203,54 @@ func (s *Store) GetShare(token string) (model.SharedCode, bool) {
 		return model.SharedCode{}, false
 	}
 	return shared, true
+}
+
+// User operations
+
+var (
+	ErrUsernameTaken = errors.New("사용자 이름이 이미 존재합니다")
+	ErrUserNotFound  = errors.New("사용자를 찾을 수 없습니다")
+	ErrInvalidPassword = errors.New("비밀번호가 일치하지 않습니다")
+)
+
+func (s *Store) CreateUser(username, password string) (model.User, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if _, exists := s.userByName[username]; exists {
+		return model.User{}, ErrUsernameTaken
+	}
+
+	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+	if err != nil {
+		return model.User{}, err
+	}
+
+	user := model.User{
+		ID:           uuid.New().String(),
+		Username:     username,
+		PasswordHash: string(hash),
+		CreatedAt:    time.Now(),
+	}
+
+	s.users[user.ID] = user
+	s.userByName[username] = user.ID
+	return user, nil
+}
+
+func (s *Store) AuthenticateUser(username, password string) (model.User, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	userID, exists := s.userByName[username]
+	if !exists {
+		return model.User{}, ErrUserNotFound
+	}
+
+	user := s.users[userID]
+	if err := bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(password)); err != nil {
+		return model.User{}, ErrInvalidPassword
+	}
+
+	return user, nil
 }

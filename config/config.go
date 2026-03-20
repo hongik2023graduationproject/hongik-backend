@@ -13,6 +13,8 @@ type Config struct {
 	ExecuteTimeout  int // seconds
 	CORSOrigins     []string
 	MaxConcurrent   int // max concurrent execute requests
+	MaxOutputBytes  int // max output size from code execution
+	JWTSecret       string
 }
 
 func Load() *Config {
@@ -25,6 +27,8 @@ func Load() *Config {
 		ExecuteTimeout:  5,
 		CORSOrigins:     parseOrigins(origins),
 		MaxConcurrent:   getEnvInt("MAX_CONCURRENT_EXEC", 5),
+		MaxOutputBytes:  getEnvInt("MAX_OUTPUT_BYTES", 1048576), // 1MB default
+		JWTSecret:       getEnv("JWT_SECRET", "hong-ik-dev-secret-change-in-production"),
 	}
 }
 

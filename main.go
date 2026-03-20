@@ -33,13 +33,17 @@ func main() {
 	store := service.NewStore()
 	interpreter := service.NewInterpreterService(cfg)
 
-	router := gin.Default()
+	router := gin.New()
+
+	// Request logging middleware (replaces default gin logger)
+	router.Use(mw.RequestLogger())
+	router.Use(gin.Recovery())
 
 	// CORS — origins from environment variable
 	router.Use(cors.New(cors.Config{
 		AllowOrigins:     cfg.CORSOrigins,
 		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
-		AllowHeaders:     []string{"Origin", "Content-Type", "Accept"},
+		AllowHeaders:     []string{"Origin", "Content-Type", "Accept", "Authorization"},
 		AllowCredentials: true,
 	}))
 
@@ -53,7 +57,7 @@ func main() {
 	// Concurrent execution semaphore
 	executeSemaphore := mw.ExecuteSemaphore(cfg.MaxConcurrent)
 
-	api.RegisterRoutes(router, store, interpreter, executeLimiter.Middleware(), executeSemaphore)
+	api.RegisterRoutes(router, store, interpreter, cfg, executeLimiter.Middleware(), executeSemaphore)
 
 	port := cfg.Port
 	log.Printf("Starting hong-ik backend on :%s (env=%s)", port, cfg.Env)
