@@ -4,8 +4,8 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"os"
 	"os/exec"
-	"strings"
 	"time"
 
 	"hongik-backend/config"
@@ -29,16 +29,34 @@ func (s *InterpreterService) Execute(req model.ExecuteRequest) model.ExecuteResp
 	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(timeout)*time.Second)
 	defer cancel()
 
+	// 임시 파일에 코드 작성 후 파일 모드로 실행
+	tmpFile, err := os.CreateTemp("", "hongik-*.hik")
+	if err != nil {
+		return model.ExecuteResponse{
+			Status: "error",
+			Error:  "임시 파일 생성 실패: " + err.Error(),
+		}
+	}
+	defer os.Remove(tmpFile.Name())
+
+	if _, err := tmpFile.WriteString(req.Code); err != nil {
+		tmpFile.Close()
+		return model.ExecuteResponse{
+			Status: "error",
+			Error:  "코드 저장 실패: " + err.Error(),
+		}
+	}
+	tmpFile.Close()
+
 	start := time.Now()
 
-	cmd := exec.CommandContext(ctx, s.cfg.InterpreterPath)
-	cmd.Stdin = strings.NewReader(req.Code)
+	cmd := exec.CommandContext(ctx, s.cfg.InterpreterPath, tmpFile.Name())
 
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
 
-	err := cmd.Run()
+	err = cmd.Run()
 	elapsed := time.Since(start).Milliseconds()
 
 	if ctx.Err() == context.DeadlineExceeded {
