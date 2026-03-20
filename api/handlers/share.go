@@ -15,6 +15,11 @@ func (h *Handler) CreateShare(c *gin.Context) {
 		return
 	}
 
+	if len(req.Code) > 100000 {
+		c.JSON(http.StatusBadRequest, model.ErrorResponse{Error: "코드가 100,000바이트 제한을 초과합니다"})
+		return
+	}
+
 	shared := h.store.CreateShare(req)
 	c.JSON(http.StatusCreated, model.ShareResponse{Token: shared.Token})
 }

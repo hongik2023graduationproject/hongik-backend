@@ -32,6 +32,11 @@ func (h *Handler) CreateSnippet(c *gin.Context) {
 		return
 	}
 
+	if len(req.Code) > 100000 {
+		c.JSON(http.StatusBadRequest, model.ErrorResponse{Error: "코드가 100,000바이트 제한을 초과합니다"})
+		return
+	}
+
 	snippet := h.store.CreateSnippet(req)
 	c.JSON(http.StatusCreated, snippet)
 }

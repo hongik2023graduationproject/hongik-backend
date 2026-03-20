@@ -16,7 +16,7 @@ func (h *Handler) Execute(c *gin.Context) {
 	}
 
 	if len(req.Code) > 100000 {
-		c.JSON(http.StatusBadRequest, model.ErrorResponse{Error: "코드가 100KB 제한을 초과합니다"})
+		c.JSON(http.StatusBadRequest, model.ErrorResponse{Error: "코드가 100,000바이트 제한을 초과합니다"})
 		return
 	}
 

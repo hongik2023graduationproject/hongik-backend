@@ -15,7 +15,7 @@ func ExecuteSemaphore(maxConcurrent int) gin.HandlerFunc {
 			defer func() { <-sem }()
 			c.Next()
 		default:
-			c.AbortWithStatusJSON(http.StatusServiceUnavailable, gin.H{
+			c.AbortWithStatusJSON(http.StatusServiceUnavailable, map[string]string{
 				"error": "서버가 현재 많은 요청을 처리 중입니다. 잠시 후 다시 시도해주세요.",
 			})
 		}

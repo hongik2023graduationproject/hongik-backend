@@ -132,7 +132,7 @@ func (s *Store) CreateShare(req model.ShareRequest) model.SharedCode {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	token := uuid.New().String()[:16]
+	token := uuid.New().String()
 	shared := model.SharedCode{
 		Token:     token,
 		Code:      req.Code,

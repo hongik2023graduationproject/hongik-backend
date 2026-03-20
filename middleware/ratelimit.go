@@ -67,7 +67,7 @@ func (rl *RateLimiter) Middleware() gin.HandlerFunc {
 		limiter := rl.getLimiter(ip)
 
 		if !limiter.Allow() {
-			c.AbortWithStatusJSON(http.StatusTooManyRequests, gin.H{
+			c.AbortWithStatusJSON(http.StatusTooManyRequests, map[string]string{
 				"error": "요청이 너무 많습니다. 잠시 후 다시 시도해주세요.",
 			})
 			return
