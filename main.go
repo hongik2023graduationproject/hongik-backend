@@ -60,7 +60,7 @@ func main() {
 			slog.Error("failed to connect to PostgreSQL", slog.String("error", err.Error()))
 			os.Exit(1)
 		}
-		defer pgStore.Close()
+		defer func() { _ = pgStore.Close() }()
 		store = pgStore
 		slog.Info("using PostgreSQL store")
 	} else {

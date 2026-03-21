@@ -25,7 +25,7 @@ func NewPostgresStore(databaseURL string) (*PostgresStore, error) {
 		return nil, err
 	}
 	if err := db.Ping(); err != nil {
-		db.Close()
+		_ = db.Close()
 		return nil, err
 	}
 	db.SetMaxOpenConns(25)
@@ -80,7 +80,7 @@ func (s *PostgresStore) ListSnippets(page, limit int) ([]model.Snippet, int) {
 		slog.Error("ListSnippets query failed", slog.String("error", err.Error()))
 		return []model.Snippet{}, total
 	}
-	defer rows.Close()
+	defer rows.Close() //nolint:errcheck
 
 	snippets := make([]model.Snippet, 0)
 	for rows.Next() {
@@ -120,7 +120,7 @@ func (s *PostgresStore) SearchSnippets(query string, page, limit int) ([]model.S
 		slog.Error("SearchSnippets query failed", slog.String("error", err.Error()))
 		return []model.Snippet{}, total
 	}
-	defer rows.Close()
+	defer rows.Close() //nolint:errcheck
 
 	snippets := make([]model.Snippet, 0)
 	for rows.Next() {

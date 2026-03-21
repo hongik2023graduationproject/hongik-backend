@@ -234,7 +234,7 @@ func TestUpdateSnippet(t *testing.T) {
 	}
 
 	var updated map[string]interface{}
-	json.Unmarshal(w2.Body.Bytes(), &updated)
+	_ = json.Unmarshal(w2.Body.Bytes(), &updated)
 	if updated["title"] != "수정됨" {
 		t.Errorf("expected title '수정됨', got %v", updated["title"])
 	}
@@ -398,7 +398,7 @@ func TestShareCreateAndGet(t *testing.T) {
 	}
 
 	var shareResp map[string]string
-	json.Unmarshal(w.Body.Bytes(), &shareResp)
+	_ = json.Unmarshal(w.Body.Bytes(), &shareResp)
 	token := shareResp["token"]
 	if token == "" {
 		t.Fatal("expected non-empty token")
@@ -414,7 +414,7 @@ func TestShareCreateAndGet(t *testing.T) {
 	}
 
 	var shared map[string]interface{}
-	json.Unmarshal(w2.Body.Bytes(), &shared)
+	_ = json.Unmarshal(w2.Body.Bytes(), &shared)
 	if shared["code"] != "출력(\"공유\")" {
 		t.Errorf("expected shared code, got %v", shared["code"])
 	}
