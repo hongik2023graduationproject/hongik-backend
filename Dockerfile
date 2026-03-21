@@ -12,7 +12,7 @@ COPY . .
 RUN CGO_ENABLED=0 GOOS=linux go build -o server .
 
 # Stage 2: Build Hong-Ik interpreter (C++)
-FROM alpine:3.19 AS hongik-builder
+FROM alpine:3.21 AS hongik-builder
 
 WORKDIR /build
 
@@ -23,7 +23,7 @@ RUN cmake -B build -DCMAKE_BUILD_TYPE=Release && \
     cmake --build build
 
 # Stage 3: Final runtime image
-FROM alpine:3.19
+FROM alpine:3.21
 
 WORKDIR /app
 
