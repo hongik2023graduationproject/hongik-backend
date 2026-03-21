@@ -829,7 +829,7 @@ func TestListSnippetsPagination(t *testing.T) {
 	router.ServeHTTP(w2, req2)
 
 	var resp2 model.SnippetListResponse
-	json.Unmarshal(w2.Body.Bytes(), &resp2)
+	_ = json.Unmarshal(w2.Body.Bytes(), &resp2)
 	if len(resp2.Snippets) != 1 {
 		t.Errorf("expected 1 snippet on page 3, got %d", len(resp2.Snippets))
 	}
@@ -993,7 +993,7 @@ func TestForkSnippet(t *testing.T) {
 	}
 
 	var forked map[string]interface{}
-	json.Unmarshal(w2.Body.Bytes(), &forked)
+	_ = json.Unmarshal(w2.Body.Bytes(), &forked)
 
 	if forked["title"] != "원본 코드 (복사본)" {
 		t.Errorf("expected title '원본 코드 (복사본)', got %v", forked["title"])
