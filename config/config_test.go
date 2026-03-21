@@ -95,8 +95,8 @@ func TestParseOrigins(t *testing.T) {
 }
 
 func TestGetEnvInt(t *testing.T) {
-	os.Setenv("TEST_INT", "42")
-	defer os.Unsetenv("TEST_INT")
+	_ = os.Setenv("TEST_INT", "42")
+	defer func() { _ = os.Unsetenv("TEST_INT") }()
 
 	if v := getEnvInt("TEST_INT", 0); v != 42 {
 		t.Errorf("expected 42, got %d", v)
@@ -105,8 +105,8 @@ func TestGetEnvInt(t *testing.T) {
 		t.Errorf("expected 99, got %d", v)
 	}
 
-	os.Setenv("TEST_INT_BAD", "not_a_number")
-	defer os.Unsetenv("TEST_INT_BAD")
+	_ = os.Setenv("TEST_INT_BAD", "not_a_number")
+	defer func() { _ = os.Unsetenv("TEST_INT_BAD") }()
 	if v := getEnvInt("TEST_INT_BAD", 7); v != 7 {
 		t.Errorf("expected 7 for invalid int, got %d", v)
 	}

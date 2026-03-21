@@ -103,7 +103,7 @@ func TestSemaphoreReturnsErrorMessage(t *testing.T) {
 	}
 
 	var resp map[string]string
-	json.Unmarshal(w.Body.Bytes(), &resp)
+	_ = json.Unmarshal(w.Body.Bytes(), &resp)
 	if resp["error"] == "" {
 		t.Error("expected error message in response")
 	}

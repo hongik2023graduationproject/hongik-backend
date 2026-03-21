@@ -142,7 +142,7 @@ func TestCreateAndGetSnippet(t *testing.T) {
 	}
 
 	var created map[string]interface{}
-	json.Unmarshal(w.Body.Bytes(), &created)
+	_ = json.Unmarshal(w.Body.Bytes(), &created)
 	id := created["id"].(string)
 
 	// Get
@@ -215,7 +215,7 @@ func TestUpdateSnippet(t *testing.T) {
 	router.ServeHTTP(w, req)
 
 	var created map[string]interface{}
-	json.Unmarshal(w.Body.Bytes(), &created)
+	_ = json.Unmarshal(w.Body.Bytes(), &created)
 	id := created["id"].(string)
 
 	// Update it
@@ -292,7 +292,7 @@ func TestUpdateSnippetCodeTooLarge(t *testing.T) {
 	router.ServeHTTP(w, req)
 
 	var created map[string]interface{}
-	json.Unmarshal(w.Body.Bytes(), &created)
+	_ = json.Unmarshal(w.Body.Bytes(), &created)
 	id := created["id"].(string)
 
 	// Update with too-large code
@@ -331,7 +331,7 @@ func TestDeleteSnippet(t *testing.T) {
 	router.ServeHTTP(w, req)
 
 	var created map[string]interface{}
-	json.Unmarshal(w.Body.Bytes(), &created)
+	_ = json.Unmarshal(w.Body.Bytes(), &created)
 	id := created["id"].(string)
 
 	// Delete it
@@ -743,7 +743,7 @@ func TestUpdateSnippetForbidden(t *testing.T) {
 	router.ServeHTTP(w, req)
 
 	var created map[string]interface{}
-	json.Unmarshal(w.Body.Bytes(), &created)
+	_ = json.Unmarshal(w.Body.Bytes(), &created)
 	id := created["id"].(string)
 
 	// User B tries to update it
@@ -779,7 +779,7 @@ func TestDeleteSnippetForbidden(t *testing.T) {
 	router.ServeHTTP(w, req)
 
 	var created map[string]interface{}
-	json.Unmarshal(w.Body.Bytes(), &created)
+	_ = json.Unmarshal(w.Body.Bytes(), &created)
 	id := created["id"].(string)
 
 	// User D tries to delete it
@@ -978,7 +978,7 @@ func TestForkSnippet(t *testing.T) {
 	router.ServeHTTP(w, req)
 
 	var created map[string]interface{}
-	json.Unmarshal(w.Body.Bytes(), &created)
+	_ = json.Unmarshal(w.Body.Bytes(), &created)
 	originalID := created["id"].(string)
 
 	// Fork it with a different user
