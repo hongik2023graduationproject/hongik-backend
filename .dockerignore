@@ -1,0 +1,14 @@
+.git
+.github
+*_test.go
+*.md
+coverage.out
+cmake-build-*
+hong-ik/.git
+hong-ik/build
+hong-ik/cmake-build-*
+hong-ik/vscode-extension
+hong-ik/web
+hong-ik/build-wasm
+hong-ik/scripts
+hong-ik/tests
