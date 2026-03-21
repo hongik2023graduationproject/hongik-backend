@@ -7,10 +7,10 @@ import (
 
 func TestLoadDefaults(t *testing.T) {
 	// Clear env vars that might interfere
-	os.Unsetenv("PORT")
-	os.Unsetenv("ENV")
-	os.Unsetenv("CORS_ORIGINS")
-	os.Unsetenv("MAX_CONCURRENT_EXEC")
+	_ = os.Unsetenv("PORT")
+	_ = os.Unsetenv("ENV")
+	_ = os.Unsetenv("CORS_ORIGINS")
+	_ = os.Unsetenv("MAX_CONCURRENT_EXEC")
 
 	cfg := Load()
 
@@ -38,15 +38,15 @@ func TestLoadDefaults(t *testing.T) {
 }
 
 func TestLoadFromEnv(t *testing.T) {
-	os.Setenv("PORT", "9090")
-	os.Setenv("ENV", "production")
-	os.Setenv("CORS_ORIGINS", "https://example.com,https://app.example.com")
-	os.Setenv("MAX_CONCURRENT_EXEC", "10")
+	_ = os.Setenv("PORT", "9090")
+	_ = os.Setenv("ENV", "production")
+	_ = os.Setenv("CORS_ORIGINS", "https://example.com,https://app.example.com")
+	_ = os.Setenv("MAX_CONCURRENT_EXEC", "10")
 	defer func() {
-		os.Unsetenv("PORT")
-		os.Unsetenv("ENV")
-		os.Unsetenv("CORS_ORIGINS")
-		os.Unsetenv("MAX_CONCURRENT_EXEC")
+		_ = os.Unsetenv("PORT")
+		_ = os.Unsetenv("ENV")
+		_ = os.Unsetenv("CORS_ORIGINS")
+		_ = os.Unsetenv("MAX_CONCURRENT_EXEC")
 	}()
 
 	cfg := Load()

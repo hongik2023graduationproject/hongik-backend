@@ -73,7 +73,7 @@ func registerAndGetToken(t *testing.T, router *gin.Engine, username, password st
 	}
 
 	var resp model.AuthResponse
-	json.Unmarshal(w.Body.Bytes(), &resp)
+	_ = json.Unmarshal(w.Body.Bytes(), &resp)
 	return resp.Token
 }
 
@@ -89,7 +89,7 @@ func TestHealthCheck(t *testing.T) {
 	}
 
 	var resp map[string]string
-	json.Unmarshal(w.Body.Bytes(), &resp)
+	_ = json.Unmarshal(w.Body.Bytes(), &resp)
 	if resp["status"] != "ok" {
 		t.Errorf("expected status ok, got %s", resp["status"])
 	}
@@ -107,7 +107,7 @@ func TestListSnippets(t *testing.T) {
 	}
 
 	var resp model.SnippetListResponse
-	json.Unmarshal(w.Body.Bytes(), &resp)
+	_ = json.Unmarshal(w.Body.Bytes(), &resp)
 	if len(resp.Snippets) != 5 {
 		t.Errorf("expected 5 seed snippets, got %d", len(resp.Snippets))
 	}
@@ -444,7 +444,7 @@ func TestGetBuiltins(t *testing.T) {
 	}
 
 	var resp map[string]interface{}
-	json.Unmarshal(w.Body.Bytes(), &resp)
+	_ = json.Unmarshal(w.Body.Bytes(), &resp)
 	builtins, ok := resp["builtins"].([]interface{})
 	if !ok || len(builtins) == 0 {
 		t.Error("expected non-empty builtins array")
@@ -463,7 +463,7 @@ func TestGetSyntax(t *testing.T) {
 	}
 
 	var resp map[string]interface{}
-	json.Unmarshal(w.Body.Bytes(), &resp)
+	_ = json.Unmarshal(w.Body.Bytes(), &resp)
 	for _, key := range []string{"types", "keywords", "operators", "delimiters"} {
 		if _, ok := resp[key]; !ok {
 			t.Errorf("expected %q in syntax response", key)
@@ -543,7 +543,7 @@ func TestRegister(t *testing.T) {
 	}
 
 	var resp model.AuthResponse
-	json.Unmarshal(w.Body.Bytes(), &resp)
+	_ = json.Unmarshal(w.Body.Bytes(), &resp)
 	if resp.Token == "" {
 		t.Error("expected non-empty token")
 	}
@@ -649,7 +649,7 @@ func TestLogin(t *testing.T) {
 	}
 
 	var resp model.AuthResponse
-	json.Unmarshal(w.Body.Bytes(), &resp)
+	_ = json.Unmarshal(w.Body.Bytes(), &resp)
 	if resp.Token == "" {
 		t.Error("expected non-empty token")
 	}
@@ -809,7 +809,7 @@ func TestListSnippetsPagination(t *testing.T) {
 	}
 
 	var resp model.SnippetListResponse
-	json.Unmarshal(w.Body.Bytes(), &resp)
+	_ = json.Unmarshal(w.Body.Bytes(), &resp)
 	if len(resp.Snippets) != 2 {
 		t.Errorf("expected 2 snippets, got %d", len(resp.Snippets))
 	}
@@ -843,7 +843,7 @@ func TestListSnippetsLimitCap(t *testing.T) {
 	router.ServeHTTP(w, req)
 
 	var resp model.SnippetListResponse
-	json.Unmarshal(w.Body.Bytes(), &resp)
+	_ = json.Unmarshal(w.Body.Bytes(), &resp)
 	if resp.Limit != 100 {
 		t.Errorf("expected limit capped to 100, got %d", resp.Limit)
 	}
@@ -857,7 +857,7 @@ func TestListSnippetsPageBeyondRange(t *testing.T) {
 	router.ServeHTTP(w, req)
 
 	var resp model.SnippetListResponse
-	json.Unmarshal(w.Body.Bytes(), &resp)
+	_ = json.Unmarshal(w.Body.Bytes(), &resp)
 	if len(resp.Snippets) != 0 {
 		t.Errorf("expected 0 snippets for out-of-range page, got %d", len(resp.Snippets))
 	}
@@ -881,7 +881,7 @@ func TestSearchSnippets(t *testing.T) {
 	}
 
 	var resp model.SnippetListResponse
-	json.Unmarshal(w.Body.Bytes(), &resp)
+	_ = json.Unmarshal(w.Body.Bytes(), &resp)
 	if resp.Total == 0 {
 		t.Error("expected at least one result for '배열'")
 	}
@@ -928,7 +928,7 @@ func TestSearchSnippetsNoResults(t *testing.T) {
 	}
 
 	var resp model.SnippetListResponse
-	json.Unmarshal(w.Body.Bytes(), &resp)
+	_ = json.Unmarshal(w.Body.Bytes(), &resp)
 	if resp.Total != 0 {
 		t.Errorf("expected 0 results, got %d", resp.Total)
 	}
@@ -950,7 +950,7 @@ func TestSearchSnippetsPagination(t *testing.T) {
 	}
 
 	var resp model.SnippetListResponse
-	json.Unmarshal(w.Body.Bytes(), &resp)
+	_ = json.Unmarshal(w.Body.Bytes(), &resp)
 	if len(resp.Snippets) > 2 {
 		t.Errorf("expected at most 2 snippets, got %d", len(resp.Snippets))
 	}

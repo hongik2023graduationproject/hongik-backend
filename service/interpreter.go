@@ -37,16 +37,16 @@ func (s *InterpreterService) Execute(req model.ExecuteRequest) model.ExecuteResp
 			Error:  "임시 파일 생성 실패: " + err.Error(),
 		}
 	}
-	defer os.Remove(tmpFile.Name())
+	defer os.Remove(tmpFile.Name()) //nolint:errcheck
 
 	if _, err := tmpFile.WriteString(req.Code); err != nil {
-		tmpFile.Close()
+		_ = tmpFile.Close()
 		return model.ExecuteResponse{
 			Status: "error",
 			Error:  "코드 저장 실패: " + err.Error(),
 		}
 	}
-	tmpFile.Close()
+	_ = tmpFile.Close()
 
 	start := time.Now()
 
