@@ -19,7 +19,11 @@ WORKDIR /build
 RUN apk add --no-cache cmake build-base g++
 
 COPY hong-ik/ ./
-RUN cmake -B build -DCMAKE_BUILD_TYPE=Release && \
+RUN cmake -B build -DCMAKE_BUILD_TYPE=Release \
+        -DBUILD_TESTING=OFF \
+        -DENABLE_TESTS=OFF \
+        -DBUILD_TESTS=OFF \
+        -DBUILD_BENCH=OFF && \
     cmake --build build --target HongIk
 
 # Stage 3: Final runtime image
