@@ -24,6 +24,24 @@ func parsePagination(c *gin.Context) (int, int) {
 	return page, limit
 }
 
+// getUserID extracts the authenticated user's ID from context.
+// Returns an empty string if not authenticated.
+func getUserID(c *gin.Context) string {
+	userID, _ := c.Get("userID")
+	id, _ := userID.(string)
+	return id
+}
+
+// validateCodeSize checks that the code does not exceed the size limit.
+// Writes a 400 response and returns false if the limit is exceeded.
+func validateCodeSize(c *gin.Context, code string) bool {
+	if len(code) > 100000 {
+		c.JSON(http.StatusBadRequest, model.ErrorResponse{Error: "코드가 100,000바이트 제한을 초과합니다"})
+		return false
+	}
+	return true
+}
+
 func (h *Handler) ListSnippets(c *gin.Context) {
 	page, limit := parsePagination(c)
 	snippets, total := h.store.ListSnippets(page, limit)
@@ -54,10 +72,7 @@ func (h *Handler) SearchSnippets(c *gin.Context) {
 func (h *Handler) ForkSnippet(c *gin.Context) {
 	id := c.Param("id")
 
-	userID, _ := c.Get("userID")
-	userIDStr, _ := userID.(string)
-
-	forked, ok := h.store.ForkSnippet(id, userIDStr)
+	forked, ok := h.store.ForkSnippet(id, getUserID(c))
 	if !ok {
 		c.JSON(http.StatusNotFound, model.ErrorResponse{Error: "스니펫을 찾을 수 없습니다"})
 		return
@@ -85,15 +100,11 @@ func (h *Handler) CreateSnippet(c *gin.Context) {
 		return
 	}
 
-	if len(req.Code) > 100000 {
-		c.JSON(http.StatusBadRequest, model.ErrorResponse{Error: "코드가 100,000바이트 제한을 초과합니다"})
+	if !validateCodeSize(c, req.Code) {
 		return
 	}
 
-	userID, _ := c.Get("userID")
-	userIDStr, _ := userID.(string)
-
-	snippet := h.store.CreateSnippet(req, userIDStr)
+	snippet := h.store.CreateSnippet(req, getUserID(c))
 	c.JSON(http.StatusCreated, snippet)
 }
 
@@ -106,15 +117,11 @@ func (h *Handler) UpdateSnippet(c *gin.Context) {
 		return
 	}
 
-	if len(req.Code) > 100000 {
-		c.JSON(http.StatusBadRequest, model.ErrorResponse{Error: "코드가 100,000바이트 제한을 초과합니다"})
+	if !validateCodeSize(c, req.Code) {
 		return
 	}
 
-	userID, _ := c.Get("userID")
-	userIDStr, _ := userID.(string)
-
-	snippet, found, owned := h.store.UpdateSnippet(id, req, userIDStr)
+	snippet, found, owned := h.store.UpdateSnippet(id, req, getUserID(c))
 	if !found {
 		c.JSON(http.StatusNotFound, model.ErrorResponse{Error: "스니펫을 찾을 수 없습니다"})
 		return
@@ -130,10 +137,7 @@ func (h *Handler) UpdateSnippet(c *gin.Context) {
 func (h *Handler) DeleteSnippet(c *gin.Context) {
 	id := c.Param("id")
 
-	userID, _ := c.Get("userID")
-	userIDStr, _ := userID.(string)
-
-	found, owned := h.store.DeleteSnippet(id, userIDStr)
+	found, owned := h.store.DeleteSnippet(id, getUserID(c))
 	if !found {
 		c.JSON(http.StatusNotFound, model.ErrorResponse{Error: "스니펫을 찾을 수 없습니다"})
 		return

@@ -36,8 +36,8 @@ func (h *AuthHandler) Register(c *gin.Context) {
 		return
 	}
 
-	if len(req.Password) < 4 || len(req.Password) > 100 {
-		c.JSON(http.StatusBadRequest, model.ErrorResponse{Error: "비밀번호는 4~100자여야 합니다"})
+	if len(req.Password) < 8 || len(req.Password) > 100 {
+		c.JSON(http.StatusBadRequest, model.ErrorResponse{Error: "비밀번호는 8~100자여야 합니다"})
 		return
 	}
 
