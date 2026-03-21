@@ -113,8 +113,12 @@ jobs:
           username: ${{ secrets.SERVER_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           port: 22
+          envs: GHCR_TOKEN
           script: |
             export PATH=$PATH:/usr/local/bin:/opt/homebrew/bin:$HOME/.docker/bin
+            echo "$GHCR_TOKEN" | docker login ghcr.io -u ${{ github.repository_owner }} --password-stdin
             cd ~/server
             docker compose pull hongik-backend
             docker compose up -d hongik-backend
+        env:
+          GHCR_TOKEN: ${{ secrets.GHCR_TOKEN }}
