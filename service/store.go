@@ -2,7 +2,7 @@ package service
 
 import (
 	"errors"
-	"log"
+	"log/slog"
 	"sort"
 	"strings"
 	"sync"
@@ -16,16 +16,43 @@ import (
 
 const shareTTL = 24 * time.Hour
 
-type Store struct {
-	mu       sync.RWMutex
-	snippets map[string]model.Snippet
-	shares   map[string]model.SharedCode
-	users    map[string]model.User // keyed by user ID
-	userByName map[string]string   // username -> user ID
+var (
+	ErrUsernameTaken   = errors.New("사용자 이름이 이미 존재합니다")
+	ErrUserNotFound    = errors.New("사용자를 찾을 수 없습니다")
+	ErrInvalidPassword = errors.New("비밀번호가 일치하지 않습니다")
+)
+
+// Store defines the interface for data persistence.
+type Store interface {
+	// Snippet operations
+	ListSnippets(page, limit int) ([]model.Snippet, int)
+	SearchSnippets(query string, page, limit int) ([]model.Snippet, int)
+	GetSnippet(id string) (model.Snippet, bool)
+	CreateSnippet(req model.CreateSnippetRequest, userID string) model.Snippet
+	UpdateSnippet(id string, req model.UpdateSnippetRequest, userID string) (model.Snippet, bool, bool)
+	DeleteSnippet(id string, userID string) (bool, bool)
+	ForkSnippet(id string, userID string) (model.Snippet, bool)
+
+	// Share operations
+	CreateShare(req model.ShareRequest) model.SharedCode
+	GetShare(token string) (model.SharedCode, bool)
+
+	// User operations
+	CreateUser(username, password string) (model.User, error)
+	AuthenticateUser(username, password string) (model.User, error)
 }
 
-func NewStore() *Store {
-	s := &Store{
+// InMemoryStore implements Store using in-memory maps.
+type InMemoryStore struct {
+	mu         sync.RWMutex
+	snippets   map[string]model.Snippet
+	shares     map[string]model.SharedCode
+	users      map[string]model.User // keyed by user ID
+	userByName map[string]string     // username -> user ID
+}
+
+func NewStore() *InMemoryStore {
+	s := &InMemoryStore{
 		snippets:   make(map[string]model.Snippet),
 		shares:     make(map[string]model.SharedCode),
 		users:      make(map[string]model.User),
@@ -36,7 +63,7 @@ func NewStore() *Store {
 	return s
 }
 
-func (s *Store) seedExamples() {
+func (s *InMemoryStore) seedExamples() {
 	examples := []model.Snippet{
 		{
 			Title:       "안녕하세요",
@@ -75,7 +102,7 @@ func (s *Store) seedExamples() {
 	}
 }
 
-func (s *Store) cleanupExpiredShares() {
+func (s *InMemoryStore) cleanupExpiredShares() {
 	ticker := time.NewTicker(1 * time.Hour)
 	defer ticker.Stop()
 
@@ -91,14 +118,14 @@ func (s *Store) cleanupExpiredShares() {
 		}
 		s.mu.Unlock()
 		if removed > 0 {
-			log.Printf("Cleaned up %d expired share(s)", removed)
+			slog.Info("cleaned up expired shares", slog.Int("count", removed))
 		}
 	}
 }
 
 // Snippet operations
 
-func (s *Store) ListSnippets(page, limit int) ([]model.Snippet, int) {
+func (s *InMemoryStore) ListSnippets(page, limit int) ([]model.Snippet, int) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
@@ -122,7 +149,7 @@ func (s *Store) ListSnippets(page, limit int) ([]model.Snippet, int) {
 	return all[start:end], total
 }
 
-func (s *Store) SearchSnippets(query string, page, limit int) ([]model.Snippet, int) {
+func (s *InMemoryStore) SearchSnippets(query string, page, limit int) ([]model.Snippet, int) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
@@ -149,7 +176,7 @@ func (s *Store) SearchSnippets(query string, page, limit int) ([]model.Snippet, 
 	return matched[start:end], total
 }
 
-func (s *Store) ForkSnippet(id string, userID string) (model.Snippet, bool) {
+func (s *InMemoryStore) ForkSnippet(id string, userID string) (model.Snippet, bool) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -172,7 +199,7 @@ func (s *Store) ForkSnippet(id string, userID string) (model.Snippet, bool) {
 	return forked, true
 }
 
-func (s *Store) GetSnippet(id string) (model.Snippet, bool) {
+func (s *InMemoryStore) GetSnippet(id string) (model.Snippet, bool) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
@@ -180,7 +207,7 @@ func (s *Store) GetSnippet(id string) (model.Snippet, bool) {
 	return sn, ok
 }
 
-func (s *Store) CreateSnippet(req model.CreateSnippetRequest, userID string) model.Snippet {
+func (s *InMemoryStore) CreateSnippet(req model.CreateSnippetRequest, userID string) model.Snippet {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -198,7 +225,7 @@ func (s *Store) CreateSnippet(req model.CreateSnippetRequest, userID string) mod
 	return sn
 }
 
-func (s *Store) UpdateSnippet(id string, req model.UpdateSnippetRequest, userID string) (model.Snippet, bool, bool) {
+func (s *InMemoryStore) UpdateSnippet(id string, req model.UpdateSnippetRequest, userID string) (model.Snippet, bool, bool) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -220,7 +247,7 @@ func (s *Store) UpdateSnippet(id string, req model.UpdateSnippetRequest, userID 
 	return sn, true, true
 }
 
-func (s *Store) DeleteSnippet(id string, userID string) (bool, bool) {
+func (s *InMemoryStore) DeleteSnippet(id string, userID string) (bool, bool) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -240,7 +267,7 @@ func (s *Store) DeleteSnippet(id string, userID string) (bool, bool) {
 
 // Share operations
 
-func (s *Store) CreateShare(req model.ShareRequest) model.SharedCode {
+func (s *InMemoryStore) CreateShare(req model.ShareRequest) model.SharedCode {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -256,7 +283,7 @@ func (s *Store) CreateShare(req model.ShareRequest) model.SharedCode {
 	return shared
 }
 
-func (s *Store) GetShare(token string) (model.SharedCode, bool) {
+func (s *InMemoryStore) GetShare(token string) (model.SharedCode, bool) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
@@ -272,13 +299,7 @@ func (s *Store) GetShare(token string) (model.SharedCode, bool) {
 
 // User operations
 
-var (
-	ErrUsernameTaken = errors.New("사용자 이름이 이미 존재합니다")
-	ErrUserNotFound  = errors.New("사용자를 찾을 수 없습니다")
-	ErrInvalidPassword = errors.New("비밀번호가 일치하지 않습니다")
-)
-
-func (s *Store) CreateUser(username, password string) (model.User, error) {
+func (s *InMemoryStore) CreateUser(username, password string) (model.User, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -303,7 +324,7 @@ func (s *Store) CreateUser(username, password string) (model.User, error) {
 	return user, nil
 }
 
-func (s *Store) AuthenticateUser(username, password string) (model.User, error) {
+func (s *InMemoryStore) AuthenticateUser(username, password string) (model.User, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 

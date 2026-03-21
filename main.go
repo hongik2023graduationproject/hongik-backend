@@ -2,10 +2,11 @@ package main
 
 import (
 	"context"
-	"log"
+	"log/slog"
 	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
@@ -19,21 +20,59 @@ import (
 	"golang.org/x/time/rate"
 )
 
+func initLogger(level string) {
+	var lvl slog.Level
+	switch strings.ToUpper(level) {
+	case "DEBUG":
+		lvl = slog.LevelDebug
+	case "WARN":
+		lvl = slog.LevelWarn
+	case "ERROR":
+		lvl = slog.LevelError
+	default:
+		lvl = slog.LevelInfo
+	}
+
+	handler := slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{
+		Level: lvl,
+	})
+	slog.SetDefault(slog.New(handler))
+}
+
 func main() {
 	cfg := config.Load()
+	initLogger(cfg.LogLevel)
 
 	if _, err := os.Stat(cfg.InterpreterPath); os.IsNotExist(err) {
-		log.Printf("WARNING: interpreter binary not found at %s — /api/execute will fail", cfg.InterpreterPath)
+		slog.Warn("interpreter binary not found — /api/execute will fail",
+			slog.String("path", cfg.InterpreterPath),
+		)
 	}
 
 	if cfg.Env == "production" {
 		gin.SetMode(gin.ReleaseMode)
 	}
 
-	store := service.NewStore()
+	var store service.Store
+	if cfg.DatabaseURL != "" {
+		pgStore, err := service.NewPostgresStore(cfg.DatabaseURL)
+		if err != nil {
+			slog.Error("failed to connect to PostgreSQL", slog.String("error", err.Error()))
+			os.Exit(1)
+		}
+		defer pgStore.Close()
+		store = pgStore
+		slog.Info("using PostgreSQL store")
+	} else {
+		store = service.NewStore()
+		slog.Info("using in-memory store")
+	}
 	interpreter := service.NewInterpreterService(cfg)
 
 	router := gin.New()
+
+	// Request ID middleware (must come before logger)
+	router.Use(mw.RequestID())
 
 	// Request logging middleware (replaces default gin logger)
 	router.Use(mw.RequestLogger())
@@ -60,9 +99,13 @@ func main() {
 	api.RegisterRoutes(router, store, interpreter, cfg, executeLimiter.Middleware(), executeSemaphore)
 
 	port := cfg.Port
-	log.Printf("Starting hong-ik backend on :%s (env=%s)", port, cfg.Env)
-	log.Printf("CORS origins: %v", cfg.CORSOrigins)
-	log.Printf("Max concurrent executions: %d", cfg.MaxConcurrent)
+	slog.Info("starting hong-ik backend",
+		slog.String("port", port),
+		slog.String("env", cfg.Env),
+		slog.String("log_level", cfg.LogLevel),
+		slog.Any("cors_origins", cfg.CORSOrigins),
+		slog.Int("max_concurrent", cfg.MaxConcurrent),
+	)
 
 	srv := &http.Server{
 		Addr:    ":" + port,
@@ -71,19 +114,21 @@ func main() {
 
 	go func() {
 		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			log.Fatalf("Failed to start server: %v", err)
+			slog.Error("failed to start server", slog.String("error", err.Error()))
+			os.Exit(1)
 		}
 	}()
 
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 	<-quit
-	log.Println("Shutting down server...")
+	slog.Info("shutting down server")
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	if err := srv.Shutdown(ctx); err != nil {
-		log.Fatalf("Server forced to shutdown: %v", err)
+		slog.Error("server forced to shutdown", slog.String("error", err.Error()))
+		os.Exit(1)
 	}
-	log.Println("Server exited")
+	slog.Info("server exited")
 }

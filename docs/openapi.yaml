@@ -1,0 +1,785 @@
+openapi: 3.0.3
+info:
+  title: Hong-ik Backend API
+  description: |
+    한국어 프로그래밍 언어 hong-ik의 백엔드 API입니다.
+    코드 실행, 스니펫 관리, 코드 공유, 사용자 인증 기능을 제공합니다.
+  version: 1.0.0
+
+servers:
+  - url: http://localhost:8080
+    description: 로컬 개발 서버
+
+tags:
+  - name: Health
+    description: 서버 상태 확인
+  - name: Execute
+    description: 한국어 코드 실행
+  - name: Auth
+    description: 사용자 인증 (회원가입/로그인)
+  - name: Snippets
+    description: 코드 스니펫 CRUD 및 검색
+  - name: Share
+    description: 코드 공유 (임시 링크)
+  - name: Language
+    description: 언어 참조 정보
+
+paths:
+  /health:
+    get:
+      tags: [Health]
+      summary: 서버 상태 확인
+      operationId: healthCheck
+      responses:
+        "200":
+          description: 서버 정상 동작
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: ok
+
+  /api/execute:
+    post:
+      tags: [Execute]
+      summary: 한국어 코드 실행
+      description: |
+        hong-ik 한국어 코드를 실행하고 결과를 반환합니다.
+        실행 전용 rate limit(0.5 req/sec, burst 30)과 동시 실행 제한이 적용됩니다.
+      operationId: executeCode
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ExecuteRequest"
+      responses:
+        "200":
+          description: 실행 완료 (성공 또는 런타임 에러)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ExecuteResponse"
+        "400":
+          description: 잘못된 요청 (코드 미입력 또는 크기/타임아웃 초과)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              examples:
+                missingCode:
+                  value:
+                    error: 코드를 입력해주세요
+                codeTooLarge:
+                  value:
+                    error: 코드가 100,000바이트 제한을 초과합니다
+                invalidTimeout:
+                  value:
+                    error: 타임아웃은 1초~30초 범위여야 합니다
+        "429":
+          description: Rate limit 초과
+        "503":
+          description: 동시 실행 제한 초과
+
+  /api/auth/register:
+    post:
+      tags: [Auth]
+      summary: 회원가입
+      operationId: register
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RegisterRequest"
+      responses:
+        "201":
+          description: 회원가입 성공
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthResponse"
+        "400":
+          description: 잘못된 요청 (유효성 검사 실패)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              examples:
+                missingFields:
+                  value:
+                    error: 사용자 이름과 비밀번호를 입력해주세요
+                invalidUsername:
+                  value:
+                    error: 사용자 이름은 2~50자여야 합니다
+                invalidPassword:
+                  value:
+                    error: 비밀번호는 4~100자여야 합니다
+        "409":
+          description: 사용자 이름 중복
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                error: 사용자 이름이 이미 존재합니다
+        "500":
+          description: 서버 내부 오류
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/auth/login:
+    post:
+      tags: [Auth]
+      summary: 로그인
+      operationId: login
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginRequest"
+      responses:
+        "200":
+          description: 로그인 성공
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthResponse"
+        "400":
+          description: 잘못된 요청
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                error: 사용자 이름과 비밀번호를 입력해주세요
+        "401":
+          description: 인증 실패
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                error: 사용자 이름 또는 비밀번호가 올바르지 않습니다
+
+  /api/snippets:
+    get:
+      tags: [Snippets]
+      summary: 스니펫 목록 조회
+      operationId: listSnippets
+      parameters:
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/Limit"
+      responses:
+        "200":
+          description: 스니펫 목록
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SnippetListResponse"
+    post:
+      tags: [Snippets]
+      summary: 스니펫 생성
+      operationId: createSnippet
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateSnippetRequest"
+      responses:
+        "201":
+          description: 스니펫 생성 완료
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Snippet"
+        "400":
+          description: 잘못된 요청
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              examples:
+                missingFields:
+                  value:
+                    error: 제목과 코드를 입력해주세요
+                codeTooLarge:
+                  value:
+                    error: 코드가 100,000바이트 제한을 초과합니다
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /api/snippets/search:
+    get:
+      tags: [Snippets]
+      summary: 스니펫 검색
+      operationId: searchSnippets
+      parameters:
+        - name: q
+          in: query
+          required: true
+          description: 검색어
+          schema:
+            type: string
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/Limit"
+      responses:
+        "200":
+          description: 검색 결과
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SnippetListResponse"
+        "400":
+          description: 검색어 미입력
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                error: 검색어를 입력해주세요
+
+  /api/snippets/{id}:
+    get:
+      tags: [Snippets]
+      summary: 스니펫 상세 조회
+      operationId: getSnippet
+      parameters:
+        - $ref: "#/components/parameters/SnippetId"
+      responses:
+        "200":
+          description: 스니펫 상세 정보
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Snippet"
+        "404":
+          description: 스니펫 없음
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                error: 스니펫을 찾을 수 없습니다
+    put:
+      tags: [Snippets]
+      summary: 스니펫 수정
+      operationId: updateSnippet
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/SnippetId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateSnippetRequest"
+      responses:
+        "200":
+          description: 스니펫 수정 완료
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Snippet"
+        "400":
+          description: 잘못된 요청
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          description: 권한 없음 (본인 스니펫만 수정 가능)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                error: 이 스니펫을 수정할 권한이 없습니다
+        "404":
+          description: 스니펫 없음
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                error: 스니펫을 찾을 수 없습니다
+    delete:
+      tags: [Snippets]
+      summary: 스니펫 삭제
+      operationId: deleteSnippet
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/SnippetId"
+      responses:
+        "200":
+          description: 스니펫 삭제 완료
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: 스니펫이 삭제되었습니다
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          description: 권한 없음 (본인 스니펫만 삭제 가능)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                error: 이 스니펫을 삭제할 권한이 없습니다
+        "404":
+          description: 스니펫 없음
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                error: 스니펫을 찾을 수 없습니다
+
+  /api/snippets/{id}/fork:
+    post:
+      tags: [Snippets]
+      summary: 스니펫 포크
+      description: 다른 사용자의 스니펫을 자신의 스니펫으로 복사합니다.
+      operationId: forkSnippet
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/SnippetId"
+      responses:
+        "201":
+          description: 포크된 스니펫
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Snippet"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          description: 원본 스니펫 없음
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                error: 스니펫을 찾을 수 없습니다
+
+  /api/share:
+    post:
+      tags: [Share]
+      summary: 코드 공유 링크 생성
+      description: 코드를 임시 공유 토큰으로 저장합니다 (인증 불필요).
+      operationId: createShare
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ShareRequest"
+      responses:
+        "201":
+          description: 공유 토큰 생성 완료
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ShareResponse"
+        "400":
+          description: 잘못된 요청
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              examples:
+                missingCode:
+                  value:
+                    error: 코드를 입력해주세요
+                codeTooLarge:
+                  value:
+                    error: 코드가 100,000바이트 제한을 초과합니다
+
+  /api/share/{token}:
+    get:
+      tags: [Share]
+      summary: 공유된 코드 조회
+      operationId: getShare
+      parameters:
+        - name: token
+          in: path
+          required: true
+          description: 공유 토큰
+          schema:
+            type: string
+      responses:
+        "200":
+          description: 공유된 코드
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SharedCode"
+        "404":
+          description: 공유 코드 없음
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                error: 공유 코드를 찾을 수 없습니다
+
+  /api/language/builtins:
+    get:
+      tags: [Language]
+      summary: 내장 함수 목록 조회
+      operationId: getBuiltins
+      responses:
+        "200":
+          description: 내장 함수 목록
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  builtins:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        name:
+                          type: string
+                          example: 출력
+                        description:
+                          type: string
+                          example: 값을 콘솔에 출력합니다
+                        usage:
+                          type: string
+                          example: 출력(값)
+
+  /api/language/syntax:
+    get:
+      tags: [Language]
+      summary: 언어 문법 참조 정보
+      operationId: getSyntax
+      responses:
+        "200":
+          description: 타입, 키워드, 연산자, 구분자 목록
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  types:
+                    type: array
+                    items:
+                      type: string
+                    example: [정수, 실수, 문자, 불, 배열]
+                  keywords:
+                    type: array
+                    items:
+                      type: string
+                    example: [만약, 라면, 아니면, 함수, 리턴]
+                  operators:
+                    type: array
+                    items:
+                      type: string
+                    example: ["+", "-", "*", "/", "==", "!=", "<", ">", "<=", ">="]
+                  delimiters:
+                    type: array
+                    items:
+                      type: string
+                    example: ["(", ")", "[", "]", "{", "}", ":", ","]
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: |
+        JWT 토큰 인증. Authorization 헤더에 `Bearer <token>` 형식으로 전달합니다.
+        토큰은 로그인 또는 회원가입 시 발급되며, 24시간 후 만료됩니다.
+        페이로드: `sub` (user ID), `exp`, `iat`. 서명: HS256.
+
+  parameters:
+    SnippetId:
+      name: id
+      in: path
+      required: true
+      description: 스니펫 ID
+      schema:
+        type: string
+    Page:
+      name: page
+      in: query
+      required: false
+      description: 페이지 번호 (기본값 1)
+      schema:
+        type: integer
+        minimum: 1
+        default: 1
+    Limit:
+      name: limit
+      in: query
+      required: false
+      description: 페이지당 항목 수 (기본값 20, 최대 100)
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 20
+
+  responses:
+    Unauthorized:
+      description: 인증 실패
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+          examples:
+            missing:
+              value:
+                error: 인증이 필요합니다
+            invalidFormat:
+              value:
+                error: 잘못된 인증 형식입니다
+            invalidToken:
+              value:
+                error: 유효하지 않은 토큰입니다
+
+  schemas:
+    ErrorResponse:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: string
+          description: 에러 메시지
+
+    ExecuteRequest:
+      type: object
+      required: [code]
+      properties:
+        code:
+          type: string
+          description: 실행할 hong-ik 코드
+          maxLength: 100000
+        input:
+          type: string
+          description: 표준 입력 데이터
+        timeout:
+          type: integer
+          description: 실행 타임아웃 (초). 0이면 기본값(5초) 사용.
+          minimum: 1
+          maximum: 30
+          default: 0
+      example:
+        code: "출력(\"안녕하세요\")"
+        timeout: 5
+
+    ExecuteResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          description: 실행 결과 상태
+          enum: [success, error, timeout]
+        output:
+          type: string
+          description: 표준 출력 결과
+        error:
+          type: string
+          description: 에러 메시지 (실패 시)
+        execution_time_ms:
+          type: integer
+          format: int64
+          description: 실행 시간 (밀리초)
+      example:
+        status: success
+        output: "안녕하세요\n"
+        execution_time_ms: 12
+
+    RegisterRequest:
+      type: object
+      required: [username, password]
+      properties:
+        username:
+          type: string
+          description: 사용자 이름
+          minLength: 2
+          maxLength: 50
+        password:
+          type: string
+          description: 비밀번호
+          minLength: 4
+          maxLength: 100
+      example:
+        username: hong
+        password: "1234"
+
+    LoginRequest:
+      type: object
+      required: [username, password]
+      properties:
+        username:
+          type: string
+          description: 사용자 이름
+        password:
+          type: string
+          description: 비밀번호
+      example:
+        username: hong
+        password: "1234"
+
+    User:
+      type: object
+      properties:
+        id:
+          type: string
+          description: 사용자 고유 ID
+        username:
+          type: string
+          description: 사용자 이름
+        created_at:
+          type: string
+          format: date-time
+          description: 가입 일시
+
+    AuthResponse:
+      type: object
+      properties:
+        token:
+          type: string
+          description: JWT 인증 토큰
+        user:
+          $ref: "#/components/schemas/User"
+
+    Snippet:
+      type: object
+      properties:
+        id:
+          type: string
+          description: 스니펫 고유 ID
+        title:
+          type: string
+          description: 스니펫 제목
+        code:
+          type: string
+          description: 코드 내용
+        description:
+          type: string
+          description: 스니펫 설명
+        user_id:
+          type: string
+          description: 작성자 ID
+        created_at:
+          type: string
+          format: date-time
+          description: 생성 일시
+        updated_at:
+          type: string
+          format: date-time
+          description: 수정 일시
+
+    CreateSnippetRequest:
+      type: object
+      required: [title, code]
+      properties:
+        title:
+          type: string
+          description: 스니펫 제목
+        code:
+          type: string
+          description: 코드 내용
+          maxLength: 100000
+        description:
+          type: string
+          description: 스니펫 설명
+      example:
+        title: 인사 프로그램
+        code: "출력(\"안녕하세요\")"
+        description: 간단한 인사 출력 예제
+
+    UpdateSnippetRequest:
+      type: object
+      required: [title, code]
+      properties:
+        title:
+          type: string
+          description: 스니펫 제목
+        code:
+          type: string
+          description: 코드 내용
+          maxLength: 100000
+        description:
+          type: string
+          description: 스니펫 설명
+
+    SnippetListResponse:
+      type: object
+      properties:
+        snippets:
+          type: array
+          items:
+            $ref: "#/components/schemas/Snippet"
+        total:
+          type: integer
+          description: 전체 스니펫 수
+        page:
+          type: integer
+          description: 현재 페이지
+        limit:
+          type: integer
+          description: 페이지당 항목 수
+
+    ShareRequest:
+      type: object
+      required: [code]
+      properties:
+        code:
+          type: string
+          description: 공유할 코드
+          maxLength: 100000
+        title:
+          type: string
+          description: 코드 제목
+      example:
+        code: "출력(\"공유 코드\")"
+        title: 공유 예제
+
+    ShareResponse:
+      type: object
+      properties:
+        token:
+          type: string
+          description: 공유 토큰 (URL에 사용)
+
+    SharedCode:
+      type: object
+      properties:
+        token:
+          type: string
+          description: 공유 토큰
+        code:
+          type: string
+          description: 공유된 코드
+        title:
+          type: string
+          description: 코드 제목
+        created_at:
+          type: string
+          description: 생성 일시

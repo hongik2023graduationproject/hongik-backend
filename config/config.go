@@ -15,6 +15,8 @@ type Config struct {
 	MaxConcurrent   int // max concurrent execute requests
 	MaxOutputBytes  int // max output size from code execution
 	JWTSecret       string
+	LogLevel        string // DEBUG, INFO, WARN, ERROR
+	DatabaseURL     string // PostgreSQL connection string; empty = use in-memory store
 }
 
 func Load() *Config {
@@ -29,6 +31,8 @@ func Load() *Config {
 		MaxConcurrent:   getEnvInt("MAX_CONCURRENT_EXEC", 5),
 		MaxOutputBytes:  getEnvInt("MAX_OUTPUT_BYTES", 1048576), // 1MB default
 		JWTSecret:       getEnv("JWT_SECRET", "hong-ik-dev-secret-change-in-production"),
+		LogLevel:        getEnv("LOG_LEVEL", "INFO"),
+		DatabaseURL:     getEnv("DATABASE_URL", ""),
 	}
 }
 

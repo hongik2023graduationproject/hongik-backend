@@ -13,11 +13,11 @@ import (
 )
 
 type AuthHandler struct {
-	store  *service.Store
+	store  service.Store
 	secret string
 }
 
-func NewAuthHandler(store *service.Store, cfg *config.Config) *AuthHandler {
+func NewAuthHandler(store service.Store, cfg *config.Config) *AuthHandler {
 	return &AuthHandler{
 		store:  store,
 		secret: cfg.JWTSecret,
