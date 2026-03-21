@@ -20,7 +20,7 @@ RUN apk add --no-cache cmake build-base g++
 
 COPY hong-ik/ ./
 RUN cmake -B build -DCMAKE_BUILD_TYPE=Release && \
-    cmake --build build
+    cmake --build build --target HongIk
 
 # Stage 3: Final runtime image
 FROM alpine:3.21
