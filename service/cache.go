@@ -59,7 +59,7 @@ func executeKey(code, input string, timeout int) string {
 	h.Write([]byte{0})
 	h.Write([]byte(input))
 	h.Write([]byte{0})
-	h.Write([]byte(fmt.Sprintf("%d", timeout)))
+	_, _ = fmt.Fprintf(h, "%d", timeout)
 	return fmt.Sprintf("exec:%x", h.Sum(nil))
 }
 
