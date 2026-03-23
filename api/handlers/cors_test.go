@@ -26,7 +26,7 @@ func setupFullRouter(origins []string) *gin.Engine {
 
 	store := service.NewStore()
 	interpreter := service.NewInterpreterService(cfg)
-	h := New(store, interpreter)
+	h := New(store, interpreter, nil)
 
 	router := gin.New()
 

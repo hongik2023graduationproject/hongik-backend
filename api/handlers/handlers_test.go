@@ -33,7 +33,7 @@ func setupRouter() *gin.Engine {
 	store := service.NewStore()
 	cfg := testConfig()
 	interpreter := service.NewInterpreterService(cfg)
-	h := New(store, interpreter)
+	h := New(store, interpreter, nil)
 	authHandler := NewAuthHandler(store, cfg)
 	authRequired := mw.AuthRequired(cfg.JWTSecret)
 

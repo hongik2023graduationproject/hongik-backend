@@ -17,6 +17,9 @@ type Config struct {
 	JWTSecret       string
 	LogLevel        string // DEBUG, INFO, WARN, ERROR
 	DatabaseURL     string // PostgreSQL connection string; empty = use in-memory store
+	RedisURL        string // Redis connection string; empty = no caching
+	CacheTTLExecute int    // seconds; TTL for code execution cache (default 3600)
+	CacheTTLData    int    // seconds; TTL for snippet/share cache (default 300)
 }
 
 func Load() *Config {
@@ -33,6 +36,9 @@ func Load() *Config {
 		JWTSecret:       getEnv("JWT_SECRET", "hong-ik-dev-secret-change-in-production"),
 		LogLevel:        getEnv("LOG_LEVEL", "INFO"),
 		DatabaseURL:     getEnv("DATABASE_URL", ""),
+		RedisURL:        getEnv("REDIS_URL", ""),
+		CacheTTLExecute: getEnvInt("CACHE_TTL_EXECUTE", 3600),
+		CacheTTLData:    getEnvInt("CACHE_TTL_DATA", 300),
 	}
 }
 

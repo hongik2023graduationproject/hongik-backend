@@ -9,8 +9,8 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-func RegisterRoutes(router *gin.Engine, store service.Store, interpreter *service.InterpreterService, cfg *config.Config, executeMiddlewares ...gin.HandlerFunc) {
-	h := handlers.New(store, interpreter)
+func RegisterRoutes(router *gin.Engine, store service.Store, interpreter *service.InterpreterService, cache *service.Cache, cfg *config.Config, executeMiddlewares ...gin.HandlerFunc) {
+	h := handlers.New(store, interpreter, cache)
 	authHandler := handlers.NewAuthHandler(store, cfg)
 	authRequired := mw.AuthRequired(cfg.JWTSecret)
 

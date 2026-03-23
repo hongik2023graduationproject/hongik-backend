@@ -24,7 +24,15 @@ func (h *Handler) Execute(c *gin.Context) {
 		return
 	}
 
+	// Check cache first
+	if cached, ok := h.cache.GetExecuteResult(req); ok {
+		cached.ExecutionTimeMs = 0 // indicate cached response
+		c.JSON(http.StatusOK, cached)
+		return
+	}
+
 	resp := h.interpreter.Execute(req)
+	h.cache.SetExecuteResult(req, resp)
 	c.JSON(http.StatusOK, resp)
 }
 

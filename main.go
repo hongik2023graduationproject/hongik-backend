@@ -69,6 +69,16 @@ func main() {
 	}
 	interpreter := service.NewInterpreterService(cfg)
 
+	cache, err := service.NewCache(cfg)
+	if err != nil {
+		slog.Warn("Redis not available — caching disabled", slog.String("error", err.Error()))
+	}
+	if cache != nil {
+		defer func() { _ = cache.Close() }()
+		store = service.NewCachedStore(store, cache)
+		slog.Info("using Redis cache")
+	}
+
 	router := gin.New()
 
 	// Request ID middleware (must come before logger)
@@ -96,7 +106,7 @@ func main() {
 	// Concurrent execution semaphore
 	executeSemaphore := mw.ExecuteSemaphore(cfg.MaxConcurrent)
 
-	api.RegisterRoutes(router, store, interpreter, cfg, executeLimiter.Middleware(), executeSemaphore)
+	api.RegisterRoutes(router, store, interpreter, cache, cfg, executeLimiter.Middleware(), executeSemaphore)
 
 	port := cfg.Port
 	slog.Info("starting hong-ik backend",

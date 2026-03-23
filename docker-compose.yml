@@ -1,15 +1,29 @@
 version: '3.8'
 
 services:
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    restart: unless-stopped
+
   backend:
     build:
       context: ..
       dockerfile: hongik-backend/Dockerfile
     ports:
       - "8080:8080"
+    depends_on:
+      - redis
     environment:
       - ENV=production
       - PORT=8080
       - INTERPRETER_PATH=/app/HongIk
       - CORS_ORIGINS=http://localhost:3000,http://localhost:5173
       - MAX_CONCURRENT_EXEC=5
+      - REDIS_URL=redis://redis:6379/0
+
+volumes:
+  redis-data:
