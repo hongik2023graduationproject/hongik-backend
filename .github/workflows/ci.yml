@@ -87,6 +87,9 @@ jobs:
           path: hong-ik
           submodules: recursive
 
+      - name: QEMU 설정 (arm64 크로스빌드)
+        uses: docker/setup-qemu-action@v3
+
       - name: Docker Buildx 설정
         uses: docker/setup-buildx-action@v3
 
