@@ -1,6 +1,3 @@
--- Migration 002: Add search indexes for snippets
--- Improves performance of LOWER(title) LIKE and LOWER(description) LIKE queries
-
 CREATE EXTENSION IF NOT EXISTS pg_trgm;
 
 CREATE INDEX IF NOT EXISTS idx_snippets_title_trgm

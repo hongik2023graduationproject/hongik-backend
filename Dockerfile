@@ -9,7 +9,8 @@ COPY go.mod go.sum ./
 RUN go mod download
 
 COPY . .
-RUN CGO_ENABLED=0 GOOS=linux go build -o server .
+RUN CGO_ENABLED=0 GOOS=linux go build -o server . \
+ && CGO_ENABLED=0 GOOS=linux go build -o migrate ./cmd/migrate
 
 # Stage 2: Build Hong-Ik interpreter (C++)
 FROM alpine:3.21 AS hongik-builder
@@ -34,9 +35,10 @@ WORKDIR /app
 RUN apk --no-cache add ca-certificates libc6-compat libstdc++
 
 COPY --from=builder /app/server .
+COPY --from=builder /app/migrate ./migrate
 COPY --from=hongik-builder /build/build/HongIk ./HongIk
 
-RUN chmod +x ./server ./HongIk
+RUN chmod +x ./server ./migrate ./HongIk
 
 ENV PORT=8080
 ENV ENV=production

@@ -31,7 +31,7 @@ func (h *Handler) Execute(c *gin.Context) {
 		return
 	}
 
-	resp := h.interpreter.Execute(req)
+	resp := h.interpreter.Execute(c.Request.Context(), req)
 	h.cache.SetExecuteResult(req, resp)
 	c.JSON(http.StatusOK, resp)
 }

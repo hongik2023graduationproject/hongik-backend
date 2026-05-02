@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"log/slog"
+	"net"
 	"net/http"
 	"os"
 	"os/signal"
@@ -43,6 +44,11 @@ func main() {
 	cfg := config.Load()
 	initLogger(cfg.LogLevel)
 
+	// Root context cancelled on SIGINT/SIGTERM. Propagated to background
+	// goroutines (DB cleanup, etc.) so they exit cleanly during shutdown.
+	rootCtx, stopSignals := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	defer stopSignals()
+
 	if _, err := os.Stat(cfg.InterpreterPath); os.IsNotExist(err) {
 		slog.Warn("interpreter binary not found — /api/execute will fail",
 			slog.String("path", cfg.InterpreterPath),
@@ -54,13 +60,14 @@ func main() {
 	}
 
 	var store service.Store
+	var pgStore *service.PostgresStore
 	if cfg.DatabaseURL != "" {
-		pgStore, err := service.NewPostgresStore(cfg.DatabaseURL)
+		var err error
+		pgStore, err = service.NewPostgresStore(rootCtx, cfg.DatabaseURL)
 		if err != nil {
 			slog.Error("failed to connect to PostgreSQL", slog.String("error", err.Error()))
 			os.Exit(1)
 		}
-		defer func() { _ = pgStore.Close() }()
 		store = pgStore
 		slog.Info("using PostgreSQL store")
 	} else {
@@ -74,7 +81,6 @@ func main() {
 		slog.Warn("Redis not available — caching disabled", slog.String("error", err.Error()))
 	}
 	if cache != nil {
-		defer func() { _ = cache.Close() }()
 		store = service.NewCachedStore(store, cache)
 		slog.Info("using Redis cache")
 	}
@@ -120,25 +126,50 @@ func main() {
 	srv := &http.Server{
 		Addr:    ":" + port,
 		Handler: router,
+		// BaseContext ties every request's ctx to rootCtx, so a shutdown
+		// signal cancels in-flight handler ctx (and the interpreter exec
+		// they spawn) instead of leaving them dangling.
+		BaseContext: func(_ net.Listener) context.Context { return rootCtx },
 	}
 
+	serverErr := make(chan error, 1)
 	go func() {
 		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			slog.Error("failed to start server", slog.String("error", err.Error()))
-			os.Exit(1)
+			serverErr <- err
 		}
+		close(serverErr)
 	}()
 
-	quit := make(chan os.Signal, 1)
-	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
-	<-quit
-	slog.Info("shutting down server")
-
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-	if err := srv.Shutdown(ctx); err != nil {
-		slog.Error("server forced to shutdown", slog.String("error", err.Error()))
-		os.Exit(1)
+	select {
+	case <-rootCtx.Done():
+		slog.Info("shutdown signal received")
+	case err := <-serverErr:
+		if err != nil {
+			slog.Error("http server failed", slog.String("error", err.Error()))
+		}
 	}
+
+	// Stop accepting new signals so a second Ctrl-C terminates immediately
+	// instead of being swallowed by the shutdown context below.
+	stopSignals()
+
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	if err := srv.Shutdown(shutdownCtx); err != nil {
+		slog.Error("server forced to shutdown", slog.String("error", err.Error()))
+	}
+
+	if cache != nil {
+		if err := cache.Close(); err != nil {
+			slog.Warn("cache close failed", slog.String("error", err.Error()))
+		}
+	}
+	if pgStore != nil {
+		if err := pgStore.Close(); err != nil {
+			slog.Warn("postgres close failed", slog.String("error", err.Error()))
+		}
+	}
+
 	slog.Info("server exited")
 }

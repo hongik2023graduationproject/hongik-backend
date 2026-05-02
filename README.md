@@ -92,15 +92,12 @@ cp .env.example .env
 docker-compose up -d postgres redis
 ```
 
-4. DB 초기화:
+4. 서버 실행 (스키마 마이그레이션은 부팅 시 자동 적용됨):
 ```bash
-psql -U hongik -d hongik -f init.sql
+go run .
 ```
 
-5. 서버 실행:
-```bash
-go run main.go
-```
+> 마이그레이션 SQL은 `migrations/`에 있고 바이너리에 임베드됩니다. 별도 `psql -f` 단계는 필요 없습니다.
 
 ### Docker Compose (권장)
 
@@ -198,6 +195,27 @@ WS /api/sessions/:id/stream
 GET /api/language/builtins   # 내장 함수 목록
 GET /api/language/syntax     # 문법 가이드
 ```
+
+## 데이터베이스 마이그레이션
+
+스키마는 [`golang-migrate`](https://github.com/golang-migrate/migrate)로 관리되며 SQL은 `migrations/`에 버전 페어로 저장됩니다 (`NNNNNN_name.up.sql` / `NNNNNN_name.down.sql`).
+
+서버가 부팅하면서 자동으로 `Up`을 적용하므로 일반적으로 추가 작업은 없습니다. 운영 시 수동 제어가 필요하면 별도 CLI를 사용합니다:
+
+```bash
+# 빌드 후 사용
+go build -o bin/migrate ./cmd/migrate
+
+DATABASE_URL=postgres://... bin/migrate up           # 모든 up 적용
+DATABASE_URL=postgres://... bin/migrate down 1       # 마지막 1단계 롤백
+DATABASE_URL=postgres://... bin/migrate version      # 현재 버전 확인
+DATABASE_URL=postgres://... bin/migrate force 2      # 더티 상태 강제 해제
+```
+
+### 새 마이그레이션 추가
+
+1. `migrations/000003_<name>.up.sql` / `000003_<name>.down.sql` 작성
+2. 다음 부팅에서 자동 적용. CI는 항상 깨끗한 DB에 `up` → `down` → `up` 사이클을 검증해야 합니다.
 
 ## 성능 특성
 

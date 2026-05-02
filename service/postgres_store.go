@@ -1,9 +1,12 @@
 package service
 
 import (
+	"context"
 	"database/sql"
+	"fmt"
 	"log/slog"
 	"strings"
+	"sync"
 	"time"
 
 	"hongik-backend/model"
@@ -15,16 +18,21 @@ import (
 
 // PostgresStore implements Store using PostgreSQL.
 type PostgresStore struct {
-	db *sql.DB
+	db     *sql.DB
+	cancel context.CancelFunc
+	wg     sync.WaitGroup
 }
 
-// NewPostgresStore opens a connection to PostgreSQL and returns a PostgresStore.
-func NewPostgresStore(databaseURL string) (*PostgresStore, error) {
+// NewPostgresStore opens a connection to PostgreSQL, applies any pending
+// schema migrations, and returns a PostgresStore. The provided ctx controls
+// the lifecycle of background goroutines (e.g., expired-share cleanup);
+// when ctx is canceled they exit cleanly.
+func NewPostgresStore(ctx context.Context, databaseURL string) (*PostgresStore, error) {
 	db, err := sql.Open("postgres", databaseURL)
 	if err != nil {
 		return nil, err
 	}
-	if err := db.Ping(); err != nil {
+	if err := db.PingContext(ctx); err != nil {
 		_ = db.Close()
 		return nil, err
 	}
@@ -32,28 +40,56 @@ func NewPostgresStore(databaseURL string) (*PostgresStore, error) {
 	db.SetMaxIdleConns(5)
 	db.SetConnMaxLifetime(5 * time.Minute)
 
-	s := &PostgresStore{db: db}
-	go s.cleanupExpiredShares()
+	// Apply migrations BEFORE handing the pool over to the rest of the app
+	// so handlers never see a half-migrated schema. golang-migrate uses an
+	// advisory lock internally, so it is safe under multi-replica rollouts.
+	if err := RunMigrations(db); err != nil {
+		_ = db.Close()
+		return nil, fmt.Errorf("schema migration failed: %w", err)
+	}
+
+	bgCtx, cancel := context.WithCancel(ctx)
+	s := &PostgresStore{db: db, cancel: cancel}
+	s.wg.Add(1)
+	go s.cleanupExpiredShares(bgCtx)
 	return s, nil
 }
 
-// Close closes the underlying database connection.
+// Close stops background goroutines and closes the underlying database
+// connection. Safe to call multiple times via the returned error from db.Close.
 func (s *PostgresStore) Close() error {
+	if s.cancel != nil {
+		s.cancel()
+	}
+	s.wg.Wait()
 	return s.db.Close()
 }
 
-func (s *PostgresStore) cleanupExpiredShares() {
+func (s *PostgresStore) cleanupExpiredShares(ctx context.Context) {
+	defer s.wg.Done()
+
 	ticker := time.NewTicker(1 * time.Hour)
 	defer ticker.Stop()
 
-	for range ticker.C {
-		result, err := s.db.Exec("DELETE FROM shared_codes WHERE expires_at > 0 AND expires_at < $1", time.Now().Unix())
-		if err != nil {
-			slog.Error("failed to cleanup expired shares", slog.String("error", err.Error()))
-			continue
-		}
-		if n, _ := result.RowsAffected(); n > 0 {
-			slog.Info("cleaned up expired shares", slog.Int64("count", n))
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			result, err := s.db.ExecContext(ctx,
+				"DELETE FROM shared_codes WHERE expires_at > 0 AND expires_at < $1",
+				time.Now().Unix(),
+			)
+			if err != nil {
+				if ctx.Err() != nil {
+					return
+				}
+				slog.Error("failed to cleanup expired shares", slog.String("error", err.Error()))
+				continue
+			}
+			if n, _ := result.RowsAffected(); n > 0 {
+				slog.Info("cleaned up expired shares", slog.Int64("count", n))
+			}
 		}
 	}
 }

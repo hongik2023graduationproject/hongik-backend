@@ -20,13 +20,13 @@ func NewInterpreterService(cfg *config.Config) *InterpreterService {
 	return &InterpreterService{cfg: cfg}
 }
 
-func (s *InterpreterService) Execute(req model.ExecuteRequest) model.ExecuteResponse {
+func (s *InterpreterService) Execute(ctx context.Context, req model.ExecuteRequest) model.ExecuteResponse {
 	timeout := s.cfg.ExecuteTimeout
 	if req.Timeout >= 1 && req.Timeout <= 30 {
 		timeout = req.Timeout
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(timeout)*time.Second)
+	ctx, cancel := context.WithTimeout(ctx, time.Duration(timeout)*time.Second)
 	defer cancel()
 
 	// 임시 파일에 코드 작성 후 파일 모드로 실행
@@ -67,6 +67,13 @@ func (s *InterpreterService) Execute(req model.ExecuteRequest) model.ExecuteResp
 		return model.ExecuteResponse{
 			Status:          "timeout",
 			Error:           fmt.Sprintf("실행 시간 초과 (%d초)", timeout),
+			ExecutionTimeMs: elapsed,
+		}
+	}
+	if ctx.Err() == context.Canceled {
+		return model.ExecuteResponse{
+			Status:          "canceled",
+			Error:           "요청이 취소되었습니다",
 			ExecutionTimeMs: elapsed,
 		}
 	}
