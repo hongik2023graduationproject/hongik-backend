@@ -107,22 +107,6 @@ jobs:
           push: true
           tags: |
             ghcr.io/${{ github.repository_owner }}/hongik-backend:latest
+            ghcr.io/${{ github.repository_owner }}/hongik-backend:main
             ghcr.io/${{ github.repository_owner }}/hongik-backend:${{ github.sha }}
           platforms: linux/arm64
-
-      - name: 서버에 배포
-        uses: appleboy/ssh-action@v1
-        with:
-          host: ${{ secrets.SERVER_HOST }}
-          username: ${{ secrets.SERVER_USER }}
-          key: ${{ secrets.SSH_PRIVATE_KEY }}
-          port: 22
-          envs: GHCR_TOKEN
-          script: |
-            export PATH=$PATH:/usr/local/bin:/opt/homebrew/bin:$HOME/.docker/bin
-            echo "$GHCR_TOKEN" | docker login ghcr.io -u ${{ github.repository_owner }} --password-stdin
-            cd ~/server
-            docker compose pull hongik-backend
-            docker compose up -d hongik-backend
-        env:
-          GHCR_TOKEN: ${{ secrets.GHCR_TOKEN }}
