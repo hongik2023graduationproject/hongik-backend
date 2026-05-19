@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"log/slog"
 	"strings"
@@ -178,7 +179,7 @@ func (s *PostgresStore) GetSnippet(id string) (model.Snippet, bool) {
 	err := s.db.QueryRow(
 		"SELECT id, title, code, description, user_id, created_at, updated_at FROM snippets WHERE id = $1", id,
 	).Scan(&sn.ID, &sn.Title, &sn.Code, &sn.Description, &userID, &sn.CreatedAt, &sn.UpdatedAt)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return model.Snippet{}, false
 	}
 	if err != nil {
@@ -321,7 +322,7 @@ func (s *PostgresStore) GetShare(token string) (model.SharedCode, bool) {
 	err := s.db.QueryRow(
 		"SELECT token, code, title, created_at, expires_at FROM shared_codes WHERE token = $1", token,
 	).Scan(&shared.Token, &shared.Code, &shared.Title, &shared.CreatedAt, &shared.ExpiresAt)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return model.SharedCode{}, false
 	}
 	if err != nil {
@@ -373,7 +374,7 @@ func (s *PostgresStore) AuthenticateUser(username, password string) (model.User,
 	err := s.db.QueryRow(
 		"SELECT id, username, password_hash, created_at FROM users WHERE username = $1", username,
 	).Scan(&user.ID, &user.Username, &user.PasswordHash, &user.CreatedAt)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return model.User{}, ErrUserNotFound
 	}
 	if err != nil {

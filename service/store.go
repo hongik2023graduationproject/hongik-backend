@@ -49,6 +49,9 @@ type InMemoryStore struct {
 	shares     map[string]model.SharedCode
 	users      map[string]model.User // keyed by user ID
 	userByName map[string]string     // username -> user ID
+	// 백그라운드 cleanup goroutine을 종료하기 위한 채널. Close()에서 닫는다.
+	done   chan struct{}
+	doneWg sync.WaitGroup
 }
 
 func NewStore() *InMemoryStore {
@@ -57,10 +60,20 @@ func NewStore() *InMemoryStore {
 		shares:     make(map[string]model.SharedCode),
 		users:      make(map[string]model.User),
 		userByName: make(map[string]string),
+		done:       make(chan struct{}),
 	}
 	s.seedExamples()
+	s.doneWg.Add(1)
 	go s.cleanupExpiredShares()
 	return s
+}
+
+// Close는 백그라운드 cleanup goroutine을 정리하고 종료를 기다린다.
+// 멱등성: 두 번 호출하면 panic. 호출 측은 정확히 한 번 호출해야 한다.
+func (s *InMemoryStore) Close() error {
+	close(s.done)
+	s.doneWg.Wait()
+	return nil
 }
 
 func (s *InMemoryStore) seedExamples() {
@@ -103,22 +116,28 @@ func (s *InMemoryStore) seedExamples() {
 }
 
 func (s *InMemoryStore) cleanupExpiredShares() {
+	defer s.doneWg.Done()
 	ticker := time.NewTicker(1 * time.Hour)
 	defer ticker.Stop()
 
-	for range ticker.C {
-		s.mu.Lock()
-		now := time.Now().Unix()
-		removed := 0
-		for token, shared := range s.shares {
-			if shared.ExpiresAt > 0 && shared.ExpiresAt < now {
-				delete(s.shares, token)
-				removed++
+	for {
+		select {
+		case <-s.done:
+			return
+		case <-ticker.C:
+			s.mu.Lock()
+			now := time.Now().Unix()
+			removed := 0
+			for token, shared := range s.shares {
+				if shared.ExpiresAt > 0 && shared.ExpiresAt < now {
+					delete(s.shares, token)
+					removed++
+				}
 			}
-		}
-		s.mu.Unlock()
-		if removed > 0 {
-			slog.Info("cleaned up expired shares", slog.Int("count", removed))
+			s.mu.Unlock()
+			if removed > 0 {
+				slog.Info("cleaned up expired shares", slog.Int("count", removed))
+			}
 		}
 	}
 }

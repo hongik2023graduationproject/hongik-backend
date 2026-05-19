@@ -66,6 +66,7 @@ func main() {
 
 	var store service.Store
 	var pgStore *service.PostgresStore
+	var memStore *service.InMemoryStore
 	if cfg.DatabaseURL != "" {
 		var err error
 		pgStore, err = service.NewPostgresStore(rootCtx, cfg.DatabaseURL)
@@ -76,7 +77,8 @@ func main() {
 		store = pgStore
 		slog.Info("using PostgreSQL store")
 	} else {
-		store = service.NewStore()
+		memStore = service.NewStore()
+		store = memStore
 		slog.Info("using in-memory store")
 	}
 	interpreter := service.NewInterpreterService(cfg)
@@ -173,6 +175,11 @@ func main() {
 	if pgStore != nil {
 		if err := pgStore.Close(); err != nil {
 			slog.Warn("postgres close failed", slog.String("error", err.Error()))
+		}
+	}
+	if memStore != nil {
+		if err := memStore.Close(); err != nil {
+			slog.Warn("in-memory store close failed", slog.String("error", err.Error()))
 		}
 	}
 
