@@ -3,6 +3,7 @@ package service
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -63,14 +64,14 @@ func (s *InterpreterService) Execute(ctx context.Context, req model.ExecuteReque
 	err = cmd.Run()
 	elapsed := time.Since(start).Milliseconds()
 
-	if ctx.Err() == context.DeadlineExceeded {
+	if errors.Is(ctx.Err(), context.DeadlineExceeded) {
 		return model.ExecuteResponse{
 			Status:          "timeout",
 			Error:           fmt.Sprintf("실행 시간 초과 (%d초)", timeout),
 			ExecutionTimeMs: elapsed,
 		}
 	}
-	if ctx.Err() == context.Canceled {
+	if errors.Is(ctx.Err(), context.Canceled) {
 		return model.ExecuteResponse{
 			Status:          "canceled",
 			Error:           "요청이 취소되었습니다",
