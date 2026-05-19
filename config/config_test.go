@@ -2,6 +2,7 @@ package config
 
 import (
 	"os"
+	"strings"
 	"testing"
 )
 
@@ -91,6 +92,36 @@ func TestParseOrigins(t *testing.T) {
 				t.Errorf("parseOrigins(%q)[%d]: expected %q, got %q", tt.input, i, tt.expected[i], v)
 			}
 		}
+	}
+}
+
+func TestValidate(t *testing.T) {
+	// Build sufficiently-long opaque values at runtime to keep no literal token strings in source.
+	strongValue := strings.Repeat("x", minJWTSecretLength+8)
+	shortValue := strings.Repeat("a", minJWTSecretLength-1)
+
+	tests := []struct {
+		name      string
+		env       string
+		jwtSecret string
+		wantErr   bool
+	}{
+		{name: "production with default value rejected", env: "production", jwtSecret: defaultJWTSecret, wantErr: true},
+		{name: "production with empty value rejected", env: "production", jwtSecret: "", wantErr: true},
+		{name: "production with short value rejected", env: "production", jwtSecret: shortValue, wantErr: true},
+		{name: "production with strong value accepted", env: "production", jwtSecret: strongValue, wantErr: false},
+		{name: "development with default value accepted", env: "development", jwtSecret: defaultJWTSecret, wantErr: false},
+		{name: "development with empty value accepted", env: "development", jwtSecret: "", wantErr: false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cfg := &Config{Env: tt.env, JWTSecret: tt.jwtSecret}
+			err := cfg.Validate()
+			if (err != nil) != tt.wantErr {
+				t.Errorf("Validate() error = %v, wantErr = %v", err, tt.wantErr)
+			}
+		})
 	}
 }
 

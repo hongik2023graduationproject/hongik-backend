@@ -44,6 +44,11 @@ func main() {
 	cfg := config.Load()
 	initLogger(cfg.LogLevel)
 
+	if err := cfg.Validate(); err != nil {
+		slog.Error("invalid configuration", slog.String("error", err.Error()))
+		os.Exit(1)
+	}
+
 	// Root context cancelled on SIGINT/SIGTERM. Propagated to background
 	// goroutines (DB cleanup, etc.) so they exit cleanly during shutdown.
 	rootCtx, stopSignals := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)

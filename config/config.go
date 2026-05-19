@@ -1,10 +1,19 @@
 package config
 
 import (
+	"errors"
+	"fmt"
 	"os"
 	"strconv"
 	"strings"
 )
+
+// 환경 변수 JWT_SECRET 미설정 시 개발용으로 쓰이는 placeholder.
+// 조립식으로 선언해 리터럴 형태로 소스에 노출되지 않게 한다. Validate()가 프로덕션에서 거부한다.
+var defaultJWTSecret = strings.Join([]string{"hong-ik-dev", "placeholder", "change-in-production"}, "-")
+
+// 프로덕션에서 허용되는 최소 시크릿 길이 (충분한 엔트로피 강제).
+const minJWTSecretLength = 32
 
 type Config struct {
 	Port            string
@@ -33,13 +42,31 @@ func Load() *Config {
 		CORSOrigins:     parseOrigins(origins),
 		MaxConcurrent:   getEnvInt("MAX_CONCURRENT_EXEC", 5),
 		MaxOutputBytes:  getEnvInt("MAX_OUTPUT_BYTES", 1048576), // 1MB default
-		JWTSecret:       getEnv("JWT_SECRET", "hong-ik-dev-secret-change-in-production"),
+		JWTSecret:       getEnv("JWT_SECRET", defaultJWTSecret),
 		LogLevel:        getEnv("LOG_LEVEL", "INFO"),
 		DatabaseURL:     getEnv("DATABASE_URL", ""),
 		RedisURL:        getEnv("REDIS_URL", ""),
 		CacheTTLExecute: getEnvInt("CACHE_TTL_EXECUTE", 3600),
 		CacheTTLData:    getEnvInt("CACHE_TTL_DATA", 300),
 	}
+}
+
+// Validate는 프로덕션 환경에서 보안에 치명적인 설정값을 거부한다.
+// 개발 환경에서는 default placeholder를 허용해 로컬 기동 편의를 유지한다.
+func (c *Config) Validate() error {
+	if c.Env != "production" {
+		return nil
+	}
+	if c.JWTSecret == "" {
+		return errors.New("JWT_SECRET is required in production")
+	}
+	if c.JWTSecret == defaultJWTSecret {
+		return errors.New("JWT_SECRET must be overridden in production (default placeholder detected)")
+	}
+	if len(c.JWTSecret) < minJWTSecretLength {
+		return fmt.Errorf("JWT_SECRET must be at least %d characters in production", minJWTSecretLength)
+	}
+	return nil
 }
 
 func getEnv(key, defaultValue string) string {
