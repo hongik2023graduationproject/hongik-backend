@@ -104,6 +104,11 @@ func main() {
 		AllowCredentials: true,
 	}))
 
+	// 요청 본문 크기 1MB로 제한. 정상 요청(스니펫 코드 100KB + 메타)은 모두 통과하는 여유 한도이며,
+	// 거대한 JSON으로 메모리를 소진시키려는 시도(예: 100MB POST)를 BindJSON 이전에 차단한다.
+	const maxRequestBodyBytes int64 = 1 << 20 // 1 MiB
+	router.Use(mw.MaxBody(maxRequestBodyBytes))
+
 	// General API rate limit: 1 req/sec with burst of 60 (≈60 req/min)
 	apiLimiter := mw.NewRateLimiter(rate.Limit(1), 60)
 	router.Use(apiLimiter.Middleware())

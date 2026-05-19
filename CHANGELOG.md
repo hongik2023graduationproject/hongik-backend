@@ -4,6 +4,9 @@
 
 ## [Unreleased] - 2026-05-19
 
+### 보안 (Security)
+- **요청 본문 크기 1 MiB 제한** — 신규 `middleware/MaxBody` 미들웨어가 모든 라우트에 적용. `http.MaxBytesReader` 기반으로 본문이 메모리에 로드되기 *전*에 차단해 거대 JSON 페이로드로 메모리를 소진시키려는 시도를 무력화한다. 정상 요청(스니펫 코드 100KB + 메타)에는 여유 있는 한도. 초과 시 `413 Payload Too Large`. 4건 단위 테스트.
+
 ### 제거 (Removed) — WASM-only 마이그
 - **`/api/execute` 엔드포인트 + InterpreterService 완전 제거.** 사용자 코드는 클라이언트(web/docs) WASM 인터프리터에서 실행되므로 백엔드는 더 이상 인터프리터 바이너리에 의존하지 않는다.
 - `service/interpreter.go` 삭제, `Cache.GetExecuteResult` / `SetExecuteResult` / `executeKey` 삭제, `model.ExecuteRequest` / `ExecuteResponse` 삭제.

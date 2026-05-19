@@ -41,4 +41,5 @@
 - **JWT 시크릿**: 프로덕션에서는 `Config.Validate()`가 기본값/빈 값/32자 미만을 거부.
 - **SQL**: 모든 쿼리는 placeholder 바인딩 (`$N`) — 동적 SQL 없음.
 - **Rate limit**: 일반 API 1 req/s burst 60. 실행 전용 limiter는 엔드포인트 제거와 함께 사라졌다.
+- **요청 본문 크기**: 1 MiB로 전역 제한 (`middleware/maxbody.go`). 초과 시 `413 Payload Too Large`. `BindJSON` 단계 이전에 차단되므로 거대 JSON으로 메모리 소진 시도가 불가능.
 - **CORS**: `CORS_ORIGINS` env var의 허용 목록 기반.
