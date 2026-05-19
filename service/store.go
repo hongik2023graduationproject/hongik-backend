@@ -1,6 +1,7 @@
 package service
 
 import (
+	"context"
 	"errors"
 	"log/slog"
 	"sort"
@@ -40,6 +41,9 @@ type Store interface {
 	// User operations
 	CreateUser(username, password string) (model.User, error)
 	AuthenticateUser(username, password string) (model.User, error)
+
+	// Health check — readiness probe용. 백엔드가 데이터 계층에 접근 가능한 상태인지 확인한다.
+	Ping(ctx context.Context) error
 }
 
 // InMemoryStore implements Store using in-memory maps.
@@ -73,6 +77,11 @@ func NewStore() *InMemoryStore {
 func (s *InMemoryStore) Close() error {
 	close(s.done)
 	s.doneWg.Wait()
+	return nil
+}
+
+// Ping은 in-memory 구현에서 항상 성공한다. 데이터 계층이 프로세스 메모리이므로 외부 의존성이 없다.
+func (s *InMemoryStore) Ping(_ context.Context) error {
 	return nil
 }
 

@@ -36,8 +36,26 @@ func (h *Handler) Execute(c *gin.Context) {
 	c.JSON(http.StatusOK, resp)
 }
 
+// HealthCheck (liveness probe): 프로세스가 살아 있고 HTTP 핸들러가 응답할 수 있는지만 확인한다.
+// 의존 자원(DB/캐시)이 죽어 있어도 200을 반환한다 — readiness와 의도적으로 구분.
+// k8s 컨벤션에 맞춰 /healthz alias도 동일하게 매핑된다.
 func (h *Handler) HealthCheck(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"status": "ok"})
+}
+
+// ReadyCheck (readiness probe): 트래픽을 받을 준비가 되었는지 확인한다.
+// 백킹 스토어 ping에 실패하면 503을 반환해 로드밸런서가 이 인스턴스를 빼도록 한다.
+// 캐시 장애는 degraded mode로 계속 서빙하므로 readiness 실패 사유가 아니다.
+func (h *Handler) ReadyCheck(c *gin.Context) {
+	if err := h.store.Ping(c.Request.Context()); err != nil {
+		c.JSON(http.StatusServiceUnavailable, gin.H{
+			"status": "not_ready",
+			"reason": "store_unreachable",
+			"error":  err.Error(),
+		})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"status": "ready"})
 }
 
 func (h *Handler) GetBuiltins(c *gin.Context) {

@@ -66,6 +66,13 @@ func (s *PostgresStore) Close() error {
 	return s.db.Close()
 }
 
+// Ping은 readiness probe용. 짧은 타임아웃을 강제하므로 응답 지연이 길어져도 probe가 행에 머무르지 않는다.
+func (s *PostgresStore) Ping(ctx context.Context) error {
+	pingCtx, cancel := context.WithTimeout(ctx, 2*time.Second)
+	defer cancel()
+	return s.db.PingContext(pingCtx)
+}
+
 func (s *PostgresStore) cleanupExpiredShares(ctx context.Context) {
 	defer s.wg.Done()
 

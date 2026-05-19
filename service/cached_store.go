@@ -1,6 +1,7 @@
 package service
 
 import (
+	"context"
 	"fmt"
 
 	"hongik-backend/model"
@@ -136,4 +137,10 @@ func (s *CachedStore) CreateUser(username, password string) (model.User, error) 
 
 func (s *CachedStore) AuthenticateUser(username, password string) (model.User, error) {
 	return s.inner.AuthenticateUser(username, password)
+}
+
+// Ping은 캐시 자체가 아닌 백킹 스토어의 readiness를 확인한다.
+// 캐시 장애는 main.go가 이미 degraded mode로 처리하므로 readiness 실패 사유가 아니다.
+func (s *CachedStore) Ping(ctx context.Context) error {
+	return s.inner.Ping(ctx)
 }
