@@ -16,38 +16,30 @@ var defaultJWTSecret = strings.Join([]string{"hong-ik-dev", "placeholder", "chan
 const minJWTSecretLength = 32
 
 type Config struct {
-	Port            string
-	Env             string
-	InterpreterPath string
-	ExecuteTimeout  int // seconds
-	CORSOrigins     []string
-	MaxConcurrent   int // max concurrent execute requests
-	MaxOutputBytes  int // max output size from code execution
-	JWTSecret       string
-	LogLevel        string // DEBUG, INFO, WARN, ERROR
-	DatabaseURL     string // PostgreSQL connection string; empty = use in-memory store
-	RedisURL        string // Redis connection string; empty = no caching
-	CacheTTLExecute int    // seconds; TTL for code execution cache (default 3600)
-	CacheTTLData    int    // seconds; TTL for snippet/share cache (default 300)
+	Port        string
+	Env         string
+	CORSOrigins []string
+	JWTSecret   string
+	LogLevel    string // DEBUG, INFO, WARN, ERROR
+	DatabaseURL string // PostgreSQL connection string; empty = use in-memory store
+	RedisURL    string // Redis connection string; empty = no caching
+	CacheTTLData int   // seconds; TTL for snippet/share cache (default 300)
+	// WASM-only 전환 이후 InterpreterPath / ExecuteTimeout / MaxConcurrent /
+	// MaxOutputBytes / CacheTTLExecute 는 더 이상 사용되지 않으므로 제거되었다.
 }
 
 func Load() *Config {
 	origins := getEnv("CORS_ORIGINS", "http://localhost:3000,http://localhost:5173")
 
 	return &Config{
-		Port:            getEnv("PORT", "8080"),
-		Env:             getEnv("ENV", "development"),
-		InterpreterPath: getEnv("INTERPRETER_PATH", "../hong-ik/cmake-build-debug/HongIk"),
-		ExecuteTimeout:  5,
-		CORSOrigins:     parseOrigins(origins),
-		MaxConcurrent:   getEnvInt("MAX_CONCURRENT_EXEC", 5),
-		MaxOutputBytes:  getEnvInt("MAX_OUTPUT_BYTES", 1048576), // 1MB default
-		JWTSecret:       getEnv("JWT_SECRET", defaultJWTSecret),
-		LogLevel:        getEnv("LOG_LEVEL", "INFO"),
-		DatabaseURL:     getEnv("DATABASE_URL", ""),
-		RedisURL:        getEnv("REDIS_URL", ""),
-		CacheTTLExecute: getEnvInt("CACHE_TTL_EXECUTE", 3600),
-		CacheTTLData:    getEnvInt("CACHE_TTL_DATA", 300),
+		Port:         getEnv("PORT", "8080"),
+		Env:          getEnv("ENV", "development"),
+		CORSOrigins:  parseOrigins(origins),
+		JWTSecret:    getEnv("JWT_SECRET", defaultJWTSecret),
+		LogLevel:     getEnv("LOG_LEVEL", "INFO"),
+		DatabaseURL:  getEnv("DATABASE_URL", ""),
+		RedisURL:     getEnv("REDIS_URL", ""),
+		CacheTTLData: getEnvInt("CACHE_TTL_DATA", 300),
 	}
 }
 

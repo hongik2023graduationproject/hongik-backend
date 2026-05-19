@@ -3,38 +3,12 @@ package handlers
 import (
 	"net/http"
 
-	"hongik-backend/model"
-
 	"github.com/gin-gonic/gin"
 )
 
-func (h *Handler) Execute(c *gin.Context) {
-	var req model.ExecuteRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, model.ErrorResponse{Error: "코드를 입력해주세요"})
-		return
-	}
-
-	if !validateCodeSize(c, req.Code) {
-		return
-	}
-
-	if req.Timeout != 0 && (req.Timeout < 1 || req.Timeout > 30) {
-		c.JSON(http.StatusBadRequest, model.ErrorResponse{Error: "타임아웃은 1초~30초 범위여야 합니다"})
-		return
-	}
-
-	// Check cache first
-	if cached, ok := h.cache.GetExecuteResult(req); ok {
-		cached.ExecutionTimeMs = 0 // indicate cached response
-		c.JSON(http.StatusOK, cached)
-		return
-	}
-
-	resp := h.interpreter.Execute(c.Request.Context(), req)
-	h.cache.SetExecuteResult(req, resp)
-	c.JSON(http.StatusOK, resp)
-}
+// 이전에 이 파일은 사용자 코드 실행 핸들러(/api/execute)를 담았으나,
+// WASM-only 전환으로 코드 실행이 클라이언트 측으로 이전되어 백엔드에서 제거되었다.
+// 남아 있는 핸들러는 health/readiness/language 메타정보 조회 — 데이터 도메인 핸들러는 snippets.go에 분리되어 있다.
 
 // HealthCheck (liveness probe): 프로세스가 살아 있고 HTTP 핸들러가 응답할 수 있는지만 확인한다.
 // 의존 자원(DB/캐시)이 죽어 있어도 200을 반환한다 — readiness와 의도적으로 구분.

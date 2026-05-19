@@ -21,19 +21,16 @@ func init() {
 }
 
 func testConfig() *config.Config {
-	return &config.Config{
-		InterpreterPath: "nonexistent-binary",
-		ExecuteTimeout:  5,
-		MaxOutputBytes:  1048576,
-		JWTSecret:       "test-secret-key",
-	}
+	cfg := &config.Config{}
+	// 테스트용 임시값: 짧고 단순. 실제 운영 시크릿과 무관.
+	cfg.JWTSecret = strings.Repeat("k", 16) + "-test"
+	return cfg
 }
 
 func setupRouter() *gin.Engine {
 	store := service.NewStore()
 	cfg := testConfig()
-	interpreter := service.NewInterpreterService(cfg)
-	h := New(store, interpreter, nil)
+	h := New(store, nil)
 	authHandler := NewAuthHandler(store, cfg)
 	authRequired := mw.AuthRequired(cfg.JWTSecret)
 
@@ -50,7 +47,6 @@ func setupRouter() *gin.Engine {
 	router.GET("/api/share/:token", h.GetShare)
 	router.GET("/api/language/builtins", h.GetBuiltins)
 	router.GET("/api/language/syntax", h.GetSyntax)
-	router.POST("/api/execute", h.Execute)
 	router.POST("/api/auth/register", authHandler.Register)
 	router.POST("/api/auth/login", authHandler.Login)
 	return router
@@ -471,58 +467,8 @@ func TestGetSyntax(t *testing.T) {
 	}
 }
 
-func TestExecuteBadRequest(t *testing.T) {
-	router := setupRouter()
-
-	// Empty body
-	w := httptest.NewRecorder()
-	req := httptest.NewRequest("POST", "/api/execute", bytes.NewReader([]byte("{}")))
-	req.Header.Set("Content-Type", "application/json")
-	router.ServeHTTP(w, req)
-
-	if w.Code != http.StatusBadRequest {
-		t.Errorf("expected 400 for empty code, got %d", w.Code)
-	}
-}
-
-func TestExecuteCodeTooLarge(t *testing.T) {
-	router := setupRouter()
-
-	largeCode := make([]byte, 100001)
-	for i := range largeCode {
-		largeCode[i] = 'a'
-	}
-	body, _ := json.Marshal(map[string]string{
-		"code": string(largeCode),
-	})
-
-	w := httptest.NewRecorder()
-	req := httptest.NewRequest("POST", "/api/execute", bytes.NewReader(body))
-	req.Header.Set("Content-Type", "application/json")
-	router.ServeHTTP(w, req)
-
-	if w.Code != http.StatusBadRequest {
-		t.Errorf("expected 400 for large code, got %d", w.Code)
-	}
-}
-
-func TestExecuteInvalidTimeout(t *testing.T) {
-	router := setupRouter()
-
-	body, _ := json.Marshal(map[string]interface{}{
-		"code":    "출력(1)",
-		"timeout": 60,
-	})
-
-	w := httptest.NewRecorder()
-	req := httptest.NewRequest("POST", "/api/execute", bytes.NewReader(body))
-	req.Header.Set("Content-Type", "application/json")
-	router.ServeHTTP(w, req)
-
-	if w.Code != http.StatusBadRequest {
-		t.Errorf("expected 400 for invalid timeout, got %d", w.Code)
-	}
-}
+// /api/execute 관련 테스트 (TestExecuteBadRequest/CodeTooLarge/InvalidTimeout/WithInput)는
+// WASM-only 전환으로 엔드포인트 자체가 사라져 제거되었다.
 
 // Auth tests
 
@@ -1032,23 +978,4 @@ func TestForkSnippetRequiresAuth(t *testing.T) {
 	}
 }
 
-// Execute with input test
-
-func TestExecuteWithInput(t *testing.T) {
-	router := setupRouter()
-
-	body, _ := json.Marshal(map[string]interface{}{
-		"code":  "출력(입력())",
-		"input": "안녕하세요",
-	})
-	w := httptest.NewRecorder()
-	req := httptest.NewRequest("POST", "/api/execute", bytes.NewReader(body))
-	req.Header.Set("Content-Type", "application/json")
-	router.ServeHTTP(w, req)
-
-	// We can't test actual execution (no interpreter binary in test),
-	// but we verify the request is accepted (not 400)
-	if w.Code == http.StatusBadRequest {
-		t.Errorf("expected request with input to be accepted, got 400")
-	}
-}
+// TestExecuteWithInput는 WASM-only 전환으로 엔드포인트 자체가 사라져 제거되었다.

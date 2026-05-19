@@ -1,17 +1,6 @@
 package model
 
-type ExecuteRequest struct {
-	Code    string `json:"code" binding:"required"`
-	Input   string `json:"input"`
-	Timeout int    `json:"timeout"` // seconds, 0 = use default (5s)
-}
-
-type ExecuteResponse struct {
-	Status          string `json:"status"`
-	Output          string `json:"output,omitempty"`
-	Error           string `json:"error,omitempty"`
-	ExecutionTimeMs int64  `json:"execution_time_ms"`
-}
+// ExecuteRequest/Response 타입은 WASM-only 전환으로 백엔드에서 코드 실행이 사라져 제거되었다.
 
 type ShareRequest struct {
 	Code  string `json:"code" binding:"required"`

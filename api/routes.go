@@ -9,8 +9,11 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-func RegisterRoutes(router *gin.Engine, store service.Store, interpreter *service.InterpreterService, cache *service.Cache, cfg *config.Config, executeMiddlewares ...gin.HandlerFunc) {
-	h := handlers.New(store, interpreter, cache)
+// RegisterRoutes는 데이터 도메인 + 메타 조회 라우트만 등록한다.
+// 사용자 코드 실행(/api/execute)은 WASM-only 전환으로 제거되었고, 그에 따라
+// 전용 rate limiter / semaphore middleware 파라미터도 사라졌다.
+func RegisterRoutes(router *gin.Engine, store service.Store, cache *service.Cache, cfg *config.Config) {
+	h := handlers.New(store, cache)
 	authHandler := handlers.NewAuthHandler(store, cfg)
 	authRequired := mw.AuthRequired(cfg.JWTSecret)
 
@@ -24,12 +27,6 @@ func RegisterRoutes(router *gin.Engine, store service.Store, interpreter *servic
 
 	api := router.Group("/api")
 	{
-		// Execute endpoint with dedicated rate limit + semaphore
-		executeHandlers := make([]gin.HandlerFunc, 0, len(executeMiddlewares)+1)
-		executeHandlers = append(executeHandlers, executeMiddlewares...)
-		executeHandlers = append(executeHandlers, h.Execute)
-		api.POST("/execute", executeHandlers...)
-
 		// Auth endpoints (public)
 		api.POST("/auth/register", authHandler.Register)
 		api.POST("/auth/login", authHandler.Login)

@@ -4,6 +4,18 @@
 
 ## [Unreleased] - 2026-05-19
 
+### 제거 (Removed) — WASM-only 마이그
+- **`/api/execute` 엔드포인트 + InterpreterService 완전 제거.** 사용자 코드는 클라이언트(web/docs) WASM 인터프리터에서 실행되므로 백엔드는 더 이상 인터프리터 바이너리에 의존하지 않는다.
+- `service/interpreter.go` 삭제, `Cache.GetExecuteResult` / `SetExecuteResult` / `executeKey` 삭제, `model.ExecuteRequest` / `ExecuteResponse` 삭제.
+- `Handler` 구조체에서 `interpreter` 필드 제거, `New(store, cache)` 시그니처로 단순화.
+- `RegisterRoutes`에서 execute 전용 rate limiter / semaphore 미들웨어 파라미터 제거.
+- `main.go`에서 인터프리터 바이너리 존재 체크, `NewInterpreterService` 호출, `executeLimiter`/`executeSemaphore` 생성 제거.
+- `config.Config`에서 `InterpreterPath` / `ExecuteTimeout` / `MaxConcurrent` / `MaxOutputBytes` / `CacheTTLExecute` 필드 제거 + 관련 env vars 제거.
+- 관련 테스트 제거: `TestExecuteBadRequest` / `TestExecuteCodeTooLarge` / `TestExecuteInvalidTimeout` / `TestExecuteWithInput`, `cache_test.go`의 execute 관련 케이스, `cors_test.go`의 `/api/execute` preflight 케이스 (다른 엔드포인트로 대체).
+- OpenAPI 스펙(`docs/openapi.yaml`)에서 `/api/execute` path + `ExecuteRequest`/`ExecuteResponse` 스키마 제거.
+- `.env.example` 정리, `SECURITY.md`의 보안 모델 갱신 (사용자 코드 실행 책임 0).
+
+
 ### 보안 (Security)
 - **JWT 시크릿 프로덕션 가드** — `Config.Validate()`가 `ENV=production`에서 빈 값/기본 placeholder/32자 미만을 거부한다. 잘못된 배포가 공개된 placeholder로 토큰을 서명하던 위험 차단.
 - placeholder 문자열을 조립식(`strings.Join`)으로 변경해 리터럴 형태로 소스에 노출되지 않게 함.

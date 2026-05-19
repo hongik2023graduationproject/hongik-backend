@@ -54,12 +54,6 @@ func main() {
 	rootCtx, stopSignals := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stopSignals()
 
-	if _, err := os.Stat(cfg.InterpreterPath); os.IsNotExist(err) {
-		slog.Warn("interpreter binary not found — /api/execute will fail",
-			slog.String("path", cfg.InterpreterPath),
-		)
-	}
-
 	if cfg.Env == "production" {
 		gin.SetMode(gin.ReleaseMode)
 	}
@@ -81,7 +75,8 @@ func main() {
 		store = memStore
 		slog.Info("using in-memory store")
 	}
-	interpreter := service.NewInterpreterService(cfg)
+
+	// 사용자 코드 실행은 WASM-only로 클라이언트로 이전됨. 백엔드는 데이터 도메인(스니펫/공유/auth)만 담당.
 
 	cache, err := service.NewCache(cfg)
 	if err != nil {
@@ -113,13 +108,9 @@ func main() {
 	apiLimiter := mw.NewRateLimiter(rate.Limit(1), 60)
 	router.Use(apiLimiter.Middleware())
 
-	// Execute-specific rate limit: 0.5 req/sec with burst of 30 (≈30 req/min)
-	executeLimiter := mw.NewRateLimiter(rate.Limit(0.5), 30)
+	// 코드 실행 전용 rate limiter / semaphore는 WASM-only 전환으로 더 이상 필요 없음.
 
-	// Concurrent execution semaphore
-	executeSemaphore := mw.ExecuteSemaphore(cfg.MaxConcurrent)
-
-	api.RegisterRoutes(router, store, interpreter, cache, cfg, executeLimiter.Middleware(), executeSemaphore)
+	api.RegisterRoutes(router, store, cache, cfg)
 
 	port := cfg.Port
 	slog.Info("starting hong-ik backend",
@@ -127,15 +118,13 @@ func main() {
 		slog.String("env", cfg.Env),
 		slog.String("log_level", cfg.LogLevel),
 		slog.Any("cors_origins", cfg.CORSOrigins),
-		slog.Int("max_concurrent", cfg.MaxConcurrent),
 	)
 
 	srv := &http.Server{
 		Addr:    ":" + port,
 		Handler: router,
 		// BaseContext ties every request's ctx to rootCtx, so a shutdown
-		// signal cancels in-flight handler ctx (and the interpreter exec
-		// they spawn) instead of leaving them dangling.
+		// signal cancels in-flight handler ctx (and any background work) instead of leaving them dangling.
 		BaseContext: func(_ net.Listener) context.Context { return rootCtx },
 	}
 

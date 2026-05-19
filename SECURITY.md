@@ -37,8 +37,8 @@
 
 ## 알려진 보안 모델
 
-- **사용자 코드 실행**: `/api/execute`는 외부 인터프리터 프로세스를 통해 실행. 코드는 임시 파일에 쓰여 argv로 전달되지 않음 (커맨드 인젝션 방지). 실행 컨텍스트는 인터프리터의 자체 샌드박스(`io.cpp` 경로 검증 + `opImport` 경로 검증)에 의존.
+- **사용자 코드 실행 — 백엔드 책임 없음**: WASM-only 전환으로 `/api/execute` 엔드포인트가 제거되었다. 사용자 코드는 사용자 브라우저의 hong-ik WASM 인터프리터에서 직접 실행되므로 백엔드 호스트에 도달하지 않는다 (메모리/CPU/FS/네트워크 격리 문제 자체가 발생하지 않음).
 - **JWT 시크릿**: 프로덕션에서는 `Config.Validate()`가 기본값/빈 값/32자 미만을 거부.
 - **SQL**: 모든 쿼리는 placeholder 바인딩 (`$N`) — 동적 SQL 없음.
-- **Rate limit**: 일반 API 1 req/s burst 60, `/api/execute` 0.5 req/s burst 30. 동시 실행 세마포어로 5건 제한.
+- **Rate limit**: 일반 API 1 req/s burst 60. 실행 전용 limiter는 엔드포인트 제거와 함께 사라졌다.
 - **CORS**: `CORS_ORIGINS` env var의 허용 목록 기반.

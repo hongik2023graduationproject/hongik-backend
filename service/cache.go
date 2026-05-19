@@ -2,14 +2,12 @@ package service
 
 import (
 	"context"
-	"crypto/sha256"
 	"encoding/json"
 	"fmt"
 	"log/slog"
 	"time"
 
 	"hongik-backend/config"
-	"hongik-backend/model"
 
 	"github.com/redis/go-redis/v9"
 )
@@ -52,65 +50,8 @@ func (c *Cache) Close() error {
 	return c.client.Close()
 }
 
-// executeKey returns a deterministic cache key for code execution.
-func executeKey(code, input string, timeout int) string {
-	h := sha256.New()
-	h.Write([]byte(code))
-	h.Write([]byte{0})
-	h.Write([]byte(input))
-	h.Write([]byte{0})
-	_, _ = fmt.Fprintf(h, "%d", timeout)
-	return fmt.Sprintf("exec:%x", h.Sum(nil))
-}
-
-// GetExecuteResult looks up a cached execution result.
-func (c *Cache) GetExecuteResult(req model.ExecuteRequest) (model.ExecuteResponse, bool) {
-	if c == nil {
-		return model.ExecuteResponse{}, false
-	}
-
-	ctx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
-	defer cancel()
-
-	key := executeKey(req.Code, req.Input, req.Timeout)
-	data, err := c.client.Get(ctx, key).Bytes()
-	if err != nil {
-		return model.ExecuteResponse{}, false
-	}
-
-	var resp model.ExecuteResponse
-	if err := json.Unmarshal(data, &resp); err != nil {
-		return model.ExecuteResponse{}, false
-	}
-
-	slog.Debug("cache hit", slog.String("key", key[:20]))
-	return resp, true
-}
-
-// SetExecuteResult caches a successful execution result.
-func (c *Cache) SetExecuteResult(req model.ExecuteRequest, resp model.ExecuteResponse) {
-	if c == nil {
-		return
-	}
-	// Only cache successful results
-	if resp.Status != "success" {
-		return
-	}
-
-	data, err := json.Marshal(resp)
-	if err != nil {
-		return
-	}
-
-	ctx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
-	defer cancel()
-
-	key := executeKey(req.Code, req.Input, req.Timeout)
-	ttl := time.Duration(c.cfg.CacheTTLExecute) * time.Second
-	if err := c.client.Set(ctx, key, data, ttl).Err(); err != nil {
-		slog.Warn("cache set failed", slog.String("error", err.Error()))
-	}
-}
+// 코드 실행 결과 캐싱(executeKey, GetExecuteResult, SetExecuteResult)은
+// WASM-only 전환으로 백엔드에서 코드 실행 자체가 사라져 제거되었다.
 
 // Get retrieves a cached value by key.
 func (c *Cache) Get(key string, dest any) bool {

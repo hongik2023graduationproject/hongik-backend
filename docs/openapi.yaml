@@ -99,47 +99,8 @@ paths:
                   error:
                     type: string
 
-  /api/execute:
-    post:
-      tags: [Execute]
-      summary: 한국어 코드 실행
-      description: |
-        hong-ik 한국어 코드를 실행하고 결과를 반환합니다.
-        실행 전용 rate limit(0.5 req/sec, burst 30)과 동시 실행 제한이 적용됩니다.
-      operationId: executeCode
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/ExecuteRequest"
-      responses:
-        "200":
-          description: 실행 완료 (성공 또는 런타임 에러)
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ExecuteResponse"
-        "400":
-          description: 잘못된 요청 (코드 미입력 또는 크기/타임아웃 초과)
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-              examples:
-                missingCode:
-                  value:
-                    error: 코드를 입력해주세요
-                codeTooLarge:
-                  value:
-                    error: 코드가 100,000바이트 제한을 초과합니다
-                invalidTimeout:
-                  value:
-                    error: 타임아웃은 1초~30초 범위여야 합니다
-        "429":
-          description: Rate limit 초과
-        "503":
-          description: 동시 실행 제한 초과
+  # /api/execute는 WASM-only 전환으로 제거되었다 — 사용자 코드는 브라우저에서
+  # hong-ik WASM 인터프리터로 직접 실행된다. 백엔드는 데이터 도메인(스니펫/공유/auth)만 담당.
 
   /api/auth/register:
     post:
@@ -627,48 +588,7 @@ components:
           type: string
           description: 에러 메시지
 
-    ExecuteRequest:
-      type: object
-      required: [code]
-      properties:
-        code:
-          type: string
-          description: 실행할 hong-ik 코드
-          maxLength: 100000
-        input:
-          type: string
-          description: 표준 입력 데이터
-        timeout:
-          type: integer
-          description: 실행 타임아웃 (초). 0이면 기본값(5초) 사용.
-          minimum: 1
-          maximum: 30
-          default: 0
-      example:
-        code: "출력(\"안녕하세요\")"
-        timeout: 5
-
-    ExecuteResponse:
-      type: object
-      properties:
-        status:
-          type: string
-          description: 실행 결과 상태
-          enum: [success, error, timeout]
-        output:
-          type: string
-          description: 표준 출력 결과
-        error:
-          type: string
-          description: 에러 메시지 (실패 시)
-        execution_time_ms:
-          type: integer
-          format: int64
-          description: 실행 시간 (밀리초)
-      example:
-        status: success
-        output: "안녕하세요\n"
-        execution_time_ms: 12
+    # ExecuteRequest / ExecuteResponse 스키마는 /api/execute 엔드포인트 제거와 함께 삭제되었다.
 
     RegisterRequest:
       type: object

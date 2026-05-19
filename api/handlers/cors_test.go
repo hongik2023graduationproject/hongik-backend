@@ -18,15 +18,11 @@ func setupFullRouter(origins []string) *gin.Engine {
 	gin.SetMode(gin.TestMode)
 
 	cfg := &config.Config{
-		InterpreterPath: "nonexistent",
-		ExecuteTimeout:  5,
-		CORSOrigins:     origins,
-		MaxConcurrent:   5,
+		CORSOrigins: origins,
 	}
 
 	store := service.NewStore()
-	interpreter := service.NewInterpreterService(cfg)
-	h := New(store, interpreter, nil)
+	h := New(store, nil)
 
 	router := gin.New()
 
@@ -44,7 +40,7 @@ func setupFullRouter(origins []string) *gin.Engine {
 	api := router.Group("/api")
 	{
 		api.GET("/snippets", h.ListSnippets)
-		api.POST("/execute", h.Execute)
+		api.POST("/snippets", h.CreateSnippet)
 	}
 
 	return router
@@ -91,7 +87,7 @@ func TestCORSPreflight(t *testing.T) {
 	router := setupFullRouter([]string{"http://localhost:3000"})
 
 	w := httptest.NewRecorder()
-	req := httptest.NewRequest("OPTIONS", "/api/execute", nil)
+	req := httptest.NewRequest("OPTIONS", "/api/snippets", nil)
 	req.Header.Set("Origin", "http://localhost:3000")
 	req.Header.Set("Access-Control-Request-Method", "POST")
 	req.Header.Set("Access-Control-Request-Headers", "Content-Type")

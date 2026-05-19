@@ -21,12 +21,6 @@ func TestLoadDefaults(t *testing.T) {
 	if cfg.Env != "development" {
 		t.Errorf("expected env development, got %s", cfg.Env)
 	}
-	if cfg.ExecuteTimeout != 5 {
-		t.Errorf("expected timeout 5, got %d", cfg.ExecuteTimeout)
-	}
-	if cfg.MaxConcurrent != 5 {
-		t.Errorf("expected max concurrent 5, got %d", cfg.MaxConcurrent)
-	}
 	if len(cfg.CORSOrigins) != 2 {
 		t.Fatalf("expected 2 CORS origins, got %d", len(cfg.CORSOrigins))
 	}
@@ -42,12 +36,10 @@ func TestLoadFromEnv(t *testing.T) {
 	_ = os.Setenv("PORT", "9090")
 	_ = os.Setenv("ENV", "production")
 	_ = os.Setenv("CORS_ORIGINS", "https://example.com,https://app.example.com")
-	_ = os.Setenv("MAX_CONCURRENT_EXEC", "10")
 	defer func() {
 		_ = os.Unsetenv("PORT")
 		_ = os.Unsetenv("ENV")
 		_ = os.Unsetenv("CORS_ORIGINS")
-		_ = os.Unsetenv("MAX_CONCURRENT_EXEC")
 	}()
 
 	cfg := Load()
@@ -57,9 +49,6 @@ func TestLoadFromEnv(t *testing.T) {
 	}
 	if cfg.Env != "production" {
 		t.Errorf("expected env production, got %s", cfg.Env)
-	}
-	if cfg.MaxConcurrent != 10 {
-		t.Errorf("expected max concurrent 10, got %d", cfg.MaxConcurrent)
 	}
 	if len(cfg.CORSOrigins) != 2 {
 		t.Fatalf("expected 2 CORS origins, got %d", len(cfg.CORSOrigins))
