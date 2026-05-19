@@ -28,11 +28,14 @@ paths:
   /health:
     get:
       tags: [Health]
-      summary: 서버 상태 확인
+      summary: Liveness probe (alias of /healthz)
+      description: |
+        프로세스가 살아 있고 HTTP 핸들러가 응답할 수 있는지만 확인한다.
+        의존 자원(DB/캐시)이 죽어 있어도 200을 반환한다.
       operationId: healthCheck
       responses:
         "200":
-          description: 서버 정상 동작
+          description: 서버 살아 있음
           content:
             application/json:
               schema:
@@ -41,6 +44,60 @@ paths:
                   status:
                     type: string
                     example: ok
+
+  /healthz:
+    get:
+      tags: [Health]
+      summary: Liveness probe (k8s convention)
+      description: /health와 동일. k8s 컨벤션 alias.
+      operationId: healthCheckK8s
+      responses:
+        "200":
+          description: 서버 살아 있음
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: ok
+
+  /readyz:
+    get:
+      tags: [Health]
+      summary: Readiness probe
+      description: |
+        트래픽을 받을 준비가 되었는지 확인한다. 백킹 스토어 ping에 실패하면 503을 반환한다.
+        로드밸런서가 503을 받으면 해당 인스턴스를 풀에서 제외해야 한다.
+        캐시 장애는 degraded mode로 처리되므로 readiness 실패 사유가 아니다.
+      operationId: readinessCheck
+      responses:
+        "200":
+          description: 트래픽 수신 가능
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: ready
+        "503":
+          description: 백킹 스토어 도달 불가
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: not_ready
+                  reason:
+                    type: string
+                    example: store_unreachable
+                  error:
+                    type: string
 
   /api/execute:
     post:

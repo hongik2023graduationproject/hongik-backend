@@ -1,6 +1,12 @@
 # 홍익 백엔드 API 서버
 
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](./LICENSE)
+[![Go](https://img.shields.io/badge/Go-1.25-00ADD8.svg?logo=go)](https://go.dev/)
+[![Gin](https://img.shields.io/badge/Gin-1.9-blue.svg)](https://gin-gonic.com/)
+
 Go + Gin 기반 홍익 언어 웹 서비스 백엔드 서버
+
+📖 **문서**: [기여 가이드](./CONTRIBUTING.md) · [보안 정책](./SECURITY.md) · [변경 이력](./CHANGELOG.md) · [운영 런북](./docs/operations/backup-recovery.md) · [OpenAPI](./docs/openapi.yaml) · [환경 변수](./.env.example) · [라이선스](./LICENSE)
 
 ## 기능
 
